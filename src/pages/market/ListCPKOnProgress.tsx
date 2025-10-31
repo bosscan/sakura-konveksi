@@ -367,7 +367,16 @@ export default function ListCPKOnProgress() {
                 </Box>
                 <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
                     <Table sx={{ minWidth: 3200 }} aria-label="spk-on-proses-table" ref={tableRef}>
-                        <TableHead>
+                        <TableHead sx={{
+                            '& .MuiTableCell-head': {
+                                whiteSpace: 'normal',
+                                overflow: 'visible',
+                                textOverflow: 'unset',
+                                lineHeight: 1.2,
+                                wordBreak: 'break-word',
+                                overflowWrap: 'anywhere',
+                            }
+                        }}>
                             <TableRow>
                                 <TableCell>No</TableCell>
                                 <TableCell>ID REKAP PRODUKSI</TableCell>

@@ -306,7 +306,16 @@ export default function PlottingRekapBordir() {
         </Box>
         <TableContainer component={Paper} sx={{ width: "100%", overflowX: "auto" }}>
           <Table sx={{ minWidth: 1800 }} aria-label="plotting-rekap-bordir" ref={tableRef}>
-            <TableHead>
+            <TableHead sx={{
+              '& .MuiTableCell-head': {
+                whiteSpace: 'normal',
+                overflow: 'visible',
+                textOverflow: 'unset',
+                lineHeight: 1.2,
+                wordBreak: 'break-word',
+                overflowWrap: 'anywhere',
+              }
+            }}>
               <TableRow>
                 <TableCell padding="checkbox">
                   <Checkbox indeterminate={someChecked && !allChecked} checked={allChecked} onChange={toggleAllVisible} />
