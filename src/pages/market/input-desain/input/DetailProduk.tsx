@@ -134,15 +134,17 @@ export default function InputDetail() {
                 p: 3,
             }}>
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Detail Produk</Typography>
-                <Grid container spacing={3} justifyContent="flex-start" alignItems='flex-start'>
-                    <Grid size={6}>
+                <Grid container spacing={2} justifyContent="flex-start" alignItems='flex-start'>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Aplikasi :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Aplikasi :</Typography>
                             <Select labelId='product-select-label' size='small' value={application} onChange={(e) => setApplication(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='BORDIR'>Bordir</MenuItem>
@@ -151,14 +153,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Jenis Bordir :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jenis Bordir :</Typography>
                             <Select labelId='sample-select-label' size='small' value={bordir} onChange={(e) => setBordir(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='LANGSUNG'>Langsung</MenuItem>
@@ -170,14 +174,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Jenis Sablon :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jenis Sablon :</Typography>
                             <Select labelId='product-select-label' size='small' value={sablon} onChange={(e) => setSablon(e.target.value)}>
                                 <MenuItem value='DTF'>DTF</MenuItem>
                                 <MenuItem value='RUBBER'>Rubber</MenuItem>
@@ -186,14 +192,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Jahitan :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jahitan :</Typography>
                             <Select labelId='product-select-label' size='small' value={jahitan} onChange={(e) => setJahitan(e.target.value)}>
                                 <MenuItem value='STANDAR'>Standar</MenuItem>
                                 <MenuItem value='SINGLE'>Single</MenuItem>
@@ -201,14 +209,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Hoodie :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Hoodie :</Typography>
                             <Select labelId='pattern-select-label' size='small' value={hoodie} onChange={(e) => setHoodie(e.target.value)}>
                                 <MenuItem value='PATEN'>Paten</MenuItem>
                                 <MenuItem value='LEPAS-PASANG'>Lepas Pasang</MenuItem>
@@ -217,42 +227,48 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Potongan Bawah :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Potongan Bawah :</Typography>
                             <Select labelId='fabric-select-label' size='small' value={cuttingButtom} onChange={(e) => setCuttingButtom(e.target.value)}>
                                 <MenuItem value='LURUS'>Lurus</MenuItem>
                                 <MenuItem value='LENGKUNG'>Lengkung</MenuItem>
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Belahan Samping :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Belahan Samping :</Typography>
                             <Select labelId='fabric-select-label' size='small' value={sideSlit} onChange={(e) => setSideSlit(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='PAKAI'>Pakai</MenuItem>
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Kerah :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Kerah :</Typography>
                             <Select labelId='product-select-label' size='small' value={neck} onChange={(e) => setNeck(e.target.value)}>
                                 <MenuItem value='STANDAR'>Standar</MenuItem>
                                 <MenuItem value='O_NECK'>O-Neck</MenuItem>
@@ -263,14 +279,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Plaket :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Plaket :</Typography>
                             <Select labelId='product-select-label' size='small' value={placard} onChange={(e) => setPlacard(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='KNOP DALAM 3 PCS - HITAM'>Knop Dalam 3 pcs - Hitam</MenuItem>
@@ -281,14 +299,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Saku :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Saku :</Typography>
                             <Select labelId='product-select-label' size='small' value={pocket} onChange={(e) => setPocket(e.target.value)}>
                                 <MenuItem value='STANDAR POLA'>Standar Pola</MenuItem>
                                 <MenuItem value='GELEMBUNG'>Gelembung</MenuItem>
@@ -297,14 +317,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Saku Bawah :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Saku Bawah :</Typography>
                             <Select labelId='product-select-label' size='small' value={bottomPocket} onChange={(e) => setBottomPocket(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='TANPA ZIPPER'>Tanpa Zipper</MenuItem>
@@ -314,14 +336,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Saku Furing :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Saku Furing :</Typography>
                             <Select labelId='product-select-label' size='small' value={furingPocket} onChange={(e) => setFuringPocket(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='KANAN KIRI'>Kanan-Kiri</MenuItem>
@@ -330,14 +354,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Ujung Lengan :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Ujung Lengan :</Typography>
                             <Select labelId='product-select-label' size='small' value={armEnd} onChange={(e) => setArmEnd(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='VELCRO'>Velcro</MenuItem>
@@ -350,14 +376,16 @@ export default function InputDetail() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Kancing Depan :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Kancing Depan :</Typography>
                             <Select labelId='product-select-label' size='small' value={frontButton} onChange={(e) => setFrontButton(e.target.value)}>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                                 <MenuItem value='LUAR'>Luar</MenuItem>
@@ -374,8 +402,9 @@ export default function InputDetail() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 mt: 2,
+                width: '100%',
             }}>
-                <Button variant='contained' size='medium' sx={{ mr: 65 }} onClick={() => navigate('/market/input-desain/input-spesifikasi')}>Kembali</Button>
+                <Button variant='contained' size='medium' onClick={() => navigate('/market/input-desain/input-spesifikasi')}>Kembali</Button>
                 <Button variant='contained' size='medium' onClick={() => navigate('/market/input-desain/input-tambahan')}>Selanjutnya</Button>
             </Box>
         </Box>

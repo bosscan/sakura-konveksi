@@ -339,70 +339,80 @@ export default function DetailTambahan() {
         mb: 3
       }}>
         <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Detail Tambahan</Typography>
-        <Grid container spacing={1}>
-          <Grid size={6}>
+        <Grid container spacing={2}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Tali Bawah :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Tali Bawah :</Typography>
               <Select labelId='product-select-label' size='small' value={bottomStrap} onChange={(e) => setBottomStrap(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='PAKAI'>Pakai</MenuItem>
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Tali Lengan :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Tali Lengan :</Typography>
               <Select labelId='sample-select-label' size='small' value={armStrap} onChange={(e) => setArmStrap(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='PAKAI'>Pakai</MenuItem>
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Ban Bawah :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Ban Bawah :</Typography>
               <Select labelId='product-select-label' size='small' value={bottomTire} onChange={(e) => setBottomTire(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='PAKAI'>Pakai</MenuItem>
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Skoder :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Skoder :</Typography>
               <Select labelId='pattern-select-label' size='small' value={skoder} onChange={(e) => setSkoder(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='PAKAI'>Pakai</MenuItem>
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Varian Saku :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Varian Saku :</Typography>
               <Select labelId='fabric-select-label' size='small' value={pocketVariant} onChange={(e) => setPocketVariant(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='STANDAR POLA'>Standar Pola</MenuItem>
@@ -414,14 +424,16 @@ export default function DetailTambahan() {
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Jenis Reflektor :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jenis Reflektor :</Typography>
               <Select labelId='fabric-select-label' size='small' value={reflector} onChange={(e) => setReflector(e.target.value)}>
                 <MenuItem value='5 JADI'>5 Jadi</MenuItem>
                 <MenuItem value='5 BIKIN'>5 Bikin</MenuItem>
@@ -433,14 +445,16 @@ export default function DetailTambahan() {
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Warna List Reflektor :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Warna List Reflektor :</Typography>
               <Select labelId='product-select-label' size='small' value={colorReflector} onChange={(e) => setColorReflector(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='HIJAU STABILO'>Hijau Stabilo</MenuItem>
@@ -451,11 +465,13 @@ export default function DetailTambahan() {
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
               <Typography variant='body1' sx={{ minWidth: 180 }}>Ventilasi :</Typography>
@@ -469,15 +485,17 @@ export default function DetailTambahan() {
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
               {/* belum beres */}
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Jahitan Ventilasi Horz :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jahitan Ventilasi Horz :</Typography>
               <Select labelId='product-select-label' size='small' value={jahitanVentilasiHorz} onChange={(e) => setJahitanVentilasiHorz(e.target.value)}>
                 <MenuItem value='2 TITIK'>2 Titik</MenuItem>
                 <MenuItem value='3 TITIK'>3 Titik</MenuItem>
@@ -486,14 +504,16 @@ export default function DetailTambahan() {
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
+                gap: 1,
                 width: '100%',
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Tempat Pulpen :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Tempat Pulpen :</Typography>
               <Select labelId='product-select-label' size='small' value={penHolder} onChange={(e) => setPenHolder(e.target.value)}>
                 <MenuItem value='POJOK SAKU KANAN'>Pojok Saku Kanan</MenuItem>
                 <MenuItem value='SAKU KANAN (TENGAH)'>Saku Kanan (Tengah)</MenuItem>

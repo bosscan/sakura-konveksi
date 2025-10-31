@@ -106,7 +106,7 @@ export default function AntrianInput() {
                 flexDirection: 'column',
         }}>
             <Box sx={{
-                width: '80%',
+                width: { xs: '100%', md: '80%' },
                     height: '500',
                     borderRadius: 2,
                     boxShadow: 2,
@@ -118,7 +118,7 @@ export default function AntrianInput() {
                 <Box>
                     <TableExportToolbar title="Antrian Input Desain" tableRef={tableRef} fileBaseName="antrian-input-desain" />
                     <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
-                <Table sx={{ minWidth: 650}} aria-label="antrian-input" ref={tableRef}>
+                <Table sx={{ minWidth: 720 }} aria-label="antrian-input" ref={tableRef}>
                     <TableHead>
                         <TableRow>
                             <TableCell>No</TableCell>

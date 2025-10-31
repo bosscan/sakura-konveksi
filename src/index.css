@@ -158,6 +158,8 @@ button:focus-visible {
     font-size: 0.85rem;
     text-align: left !important;
     white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* Opt-in class to wrap long text when needed inside a cell */
