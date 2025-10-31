@@ -1,10 +1,12 @@
 import { Box, Typography, Grid, TextField, RadioGroup, FormControlLabel, Radio, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Select, MenuItem, Snackbar, Alert } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 import TableExportToolbar from '../../components/TableExportToolbar'
 import Api from '../../lib/api'
 import { Delete } from '@mui/icons-material'
 
 function InputPesanan() {
+    const navigate = useNavigate();
     const tableRef = useRef<HTMLTableElement | null>(null);
     const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' });
     // provinsi
@@ -282,6 +284,9 @@ function InputPesanan() {
         } catch {}
         // optional: clear list pesanan only
         setItems([]);
+
+        // Redirect to Antrian Input Desain after a short delay so the snackbar is visible
+        setTimeout(() => navigate('/market/input-desain/antrian-input'), 600);
     };
 
     return (
