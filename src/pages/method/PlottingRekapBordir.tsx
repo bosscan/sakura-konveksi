@@ -271,38 +271,39 @@ export default function PlottingRekapBordir() {
         <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", textAlign: "center" }}>
           Plotting Rekap Bordir
         </Typography>
-        <Stack direction="row" spacing={2} sx={{ mb: 2 }}>
-          <TextField
-            label="Search"
-            variant="outlined"
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: 250 }}
-          />
-          <TextField
-            label="Status Pesanan"
-            variant="outlined"
-            size="small"
-            select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            sx={{ minWidth: 200 }}
-          >
-            <MenuItem value="">Semua</MenuItem>
-            {statusOptions.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
-          <Box sx={{ flex: 1 }} />
-          <Button variant="contained" color="primary" disabled={!canGenerate} onClick={handleGenerate}>
-            Generate Rekap Bordir
-          </Button>
-        </Stack>
-
-        <TableExportToolbar title="Plotting Rekap Bordir" tableRef={tableRef} fileBaseName="plotting-rekap-bordir" />
+        <Box sx={{ overflowX: 'auto', mb: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
+            <TextField
+              label="Search"
+              variant="outlined"
+              size="small"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ width: { xs: 220, sm: 260, md: 380 } }}
+            />
+            <TextField
+              label="Status Pesanan"
+              variant="outlined"
+              size="small"
+              select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              sx={{ width: { xs: 180, sm: 200, md: 240 } }}
+            >
+              <MenuItem value="">Semua</MenuItem>
+              {statusOptions.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Button variant="contained" color="primary" disabled={!canGenerate} onClick={handleGenerate}>
+              Generate Rekap Bordir
+            </Button>
+            <Box sx={{ flex: 1 }} />
+            <TableExportToolbar title="Plotting Rekap Bordir" tableRef={tableRef} fileBaseName="plotting-rekap-bordir" />
+          </Stack>
+        </Box>
         <TableContainer component={Paper} sx={{ width: "100%", overflowX: "auto" }}>
           <Table sx={{ minWidth: 1800 }} aria-label="plotting-rekap-bordir" ref={tableRef}>
             <TableHead>

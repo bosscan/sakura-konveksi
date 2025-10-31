@@ -1,5 +1,5 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
-import { Box, IconButton, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography } from '@mui/material';
+import { Box, IconButton, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography, Stack } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import DeleteIcon from '@mui/icons-material/Delete';
 
@@ -207,7 +207,11 @@ export default function ListSpkUrgent() {
     <Box sx={{ p: 3 }}>
       <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>List SPK Urgent</Typography>
       <Paper sx={{ p: 2 }}>
-        <TextField placeholder="Cari (ID/Nama/Jenis/QTY)" size="small" sx={{ mb: 1 }} value={q} onChange={(e) => setQ(e.target.value)} />
+        <Box sx={{ overflowX: 'auto', mb: 1 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
+            <TextField placeholder="Cari (ID/Nama/Jenis/QTY)" size="small" value={q} onChange={(e) => setQ(e.target.value)} sx={{ width: { xs: 220, sm: 280, md: 360 } }} />
+          </Stack>
+        </Box>
         <Table size="small">
           <TableHead>
             <TableRow>

@@ -13,7 +13,8 @@ import {
     Paper,
     Alert,
     Modal,
-    Button
+    Button,
+    Stack
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -132,19 +133,26 @@ export default function DatabaseProduk() {
                         {alert.message}
                     </Alert>
                 )}
-                <TextField
-                    placeholder="Cari produk..."
-                    value={searchTerm}
-                    onChange={handleSearch}
-                    InputProps={{
-                        startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-                    }}
-                    sx={{ width: 250, mb: 2 }}
-                />
+                <Box sx={{ overflowX: 'auto', mb: 2 }}>
+                    <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
+                        <TextField
+                            placeholder="Cari produk..."
+                            value={searchTerm}
+                            onChange={handleSearch}
+                            InputProps={{
+                                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                            }}
+                            size="small"
+                            sx={{ width: { xs: 220, sm: 260, md: 320 } }}
+                        />
+                        {showTable && (
+                            <TableExportToolbar title="Database Produk" tableRef={tableRef} fileBaseName="database-produk" />
+                        )}
+                    </Stack>
+                </Box>
 
                 {showTable && ( // Hanya tampilkan tabel jika showTable true
                     <>
-                        <TableExportToolbar title="Database Produk" tableRef={tableRef} fileBaseName="database-produk" />
                         <TableContainer component={Paper}>
                             <Table ref={tableRef}>
                                 <TableHead>

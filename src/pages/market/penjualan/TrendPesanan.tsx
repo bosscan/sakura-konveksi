@@ -12,7 +12,8 @@ import {
     Typography,
     Paper,
     Alert,
-    Button
+    Button,
+    Stack
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -107,36 +108,38 @@ export default function TrendPesanan() {
                         {alert.message}
                     </Alert>
                 )}
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                        <TextField
-                            placeholder="Cari trend..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            InputProps={{
-                                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-                            }}
-                            size='small'
-                            sx={{ width: 250 }}
-                        />
-                        <TextField
-                            label="Tanggal Awal"
-                            type="date"
-                            value={startDate}
-                            onChange={(e) => { setStartDate(e.target.value); setPage(0); }}
-                            InputLabelProps={{ shrink: true }}
-                            size='small'
-                            sx={{ width: 180, ml: 2 }}
-                        />
-                        <TextField
-                            label="Tanggal Akhir"
-                            type="date"
-                            value={endDate}
-                            onChange={(e) => { setEndDate(e.target.value); setPage(0); }}
-                            InputLabelProps={{ shrink: true }}
-                            size='small'
-                            sx={{ width: 180, ml: 2 }}
-                        />
-                        <Button variant='outlined' size='small' sx={{ ml: 2 }} onClick={() => { setStartDate(''); setEndDate(''); setPage(0); }}>Reset</Button>
+                    <Box sx={{ overflowX: 'auto', mb: 2 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
+                            <TextField
+                                placeholder="Cari trend..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                                }}
+                                size='small'
+                                sx={{ width: { xs: 220, sm: 260, md: 320 } }}
+                            />
+                            <TextField
+                                label="Tanggal Awal"
+                                type="date"
+                                value={startDate}
+                                onChange={(e) => { setStartDate(e.target.value); setPage(0); }}
+                                InputLabelProps={{ shrink: true }}
+                                size='small'
+                                sx={{ width: { xs: 160, sm: 180 } }}
+                            />
+                            <TextField
+                                label="Tanggal Akhir"
+                                type="date"
+                                value={endDate}
+                                onChange={(e) => { setEndDate(e.target.value); setPage(0); }}
+                                InputLabelProps={{ shrink: true }}
+                                size='small'
+                                sx={{ width: { xs: 160, sm: 180 } }}
+                            />
+                            <Button variant='outlined' size='small' onClick={() => { setStartDate(''); setEndDate(''); setPage(0); }}>Reset</Button>
+                        </Stack>
                     </Box>
 
                     <TableContainer component={Paper}>

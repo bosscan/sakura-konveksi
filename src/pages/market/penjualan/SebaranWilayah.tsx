@@ -16,7 +16,8 @@ import {
     InputLabel,
     Select,
     MenuItem,
-    Button
+    Button,
+    Stack
 } from '@mui/material';
 import {
     Search as SearchIcon,
@@ -108,46 +109,48 @@ export default function SebaranWilayah() {
                         {alert.message}
                     </Alert>
                 )}
-                    <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
-                        <TextField
-                            placeholder="Cari sebaran Wilayah..."
-                            value={searchTerm}
-                            onChange={(e) => setSearchTerm(e.target.value)}
-                            InputProps={{
-                                startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
-                            }}
-                            size='small'
-                            sx={{ width: 250 }}
-                        />
-                        <FormControl size='small' sx={{ m: 1, minWidth: 150 }}>
-                            <InputLabel id='filter-tanggal'>Tanggal Awal</InputLabel>
-                            <Select
-                                labelId='filter-tanggal'
-                                value={selectedDate}
-                                label='Filter Tanggal'
-                                onChange={e => setSelectedDate(e.target.value)}
-                            >
-                                <MenuItem value=''>Semua Tanggal</MenuItem>
-                                {uniqueDates.map(date => (
-                                    <MenuItem key={date} value={date}>{date}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <FormControl size='small' sx={{ m: 1, minWidth: 150 }}>
-                            <InputLabel id='filter-tanggal'>Tanggal Akhir</InputLabel>
-                            <Select
-                                labelId='filter-tanggal'
-                                value={selectedDate}
-                                label='Filter Tanggal'
-                                onChange={e => setSelectedDate(e.target.value)}
-                            >
-                                <MenuItem value=''>Semua Tanggal</MenuItem>
-                                {uniqueDates.map(date => (
-                                    <MenuItem key={date} value={date}>{date}</MenuItem>
-                                ))}
-                            </Select>
-                        </FormControl>
-                        <Button variant='outlined' size='small' onClick={() => setSelectedDate(selectedDate)}>Cari</Button>
+                    <Box sx={{ overflowX: 'auto', mb: 2 }}>
+                        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
+                            <TextField
+                                placeholder="Cari sebaran Wilayah..."
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                InputProps={{
+                                    startAdornment: <SearchIcon sx={{ mr: 1, color: 'text.secondary' }} />,
+                                }}
+                                size='small'
+                                sx={{ width: { xs: 220, sm: 260, md: 320 } }}
+                            />
+                            <FormControl size='small' sx={{ minWidth: { xs: 160, sm: 180, md: 200 } }}>
+                                <InputLabel id='filter-tanggal-awal'>Tanggal Awal</InputLabel>
+                                <Select
+                                    labelId='filter-tanggal-awal'
+                                    value={selectedDate}
+                                    label='Tanggal Awal'
+                                    onChange={e => setSelectedDate(e.target.value)}
+                                >
+                                    <MenuItem value=''>Semua Tanggal</MenuItem>
+                                    {uniqueDates.map(date => (
+                                        <MenuItem key={date} value={date}>{date}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <FormControl size='small' sx={{ minWidth: { xs: 160, sm: 180, md: 200 } }}>
+                                <InputLabel id='filter-tanggal-akhir'>Tanggal Akhir</InputLabel>
+                                <Select
+                                    labelId='filter-tanggal-akhir'
+                                    value={selectedDate}
+                                    label='Tanggal Akhir'
+                                    onChange={e => setSelectedDate(e.target.value)}
+                                >
+                                    <MenuItem value=''>Semua Tanggal</MenuItem>
+                                    {uniqueDates.map(date => (
+                                        <MenuItem key={date} value={date}>{date}</MenuItem>
+                                    ))}
+                                </Select>
+                            </FormControl>
+                            <Button variant='outlined' size='small' onClick={() => setSelectedDate(selectedDate)}>Cari</Button>
+                        </Stack>
                     </Box>
 
                     <TableContainer component={Paper}>

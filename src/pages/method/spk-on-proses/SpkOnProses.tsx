@@ -1,4 +1,4 @@
-import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, TextField, MenuItem, Button } from "@mui/material";
+import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, TextField, MenuItem, Button, Stack } from "@mui/material";
 import PrintIcon from '@mui/icons-material/Print';
 import { runAllMigrationsOnce } from '../../../lib/migrations';
 import { useEffect, useRef, useState } from "react";
@@ -297,33 +297,36 @@ export default function SpkOnProses() {
         <Typography variant="h6" sx={{ mb: 2, fontWeight: "bold", textAlign: "center" }}>
           List SPK On Proses
         </Typography>
-        <Box sx={{ display: "flex", gap: 2, mb: 2 }}>
-          <TextField
-            label="Search"
-            variant="outlined"
-            size="small"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            sx={{ minWidth: 250 }}
-          />
-          <TextField
-            label="Status Pesanan"
-            variant="outlined"
-            size="small"
-            select
-            value={statusFilter}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            sx={{ minWidth: 180 }}
-          >
-            <MenuItem value="">Semua</MenuItem>
-            {statusOptions.map((opt) => (
-              <MenuItem key={opt} value={opt}>
-                {opt}
-              </MenuItem>
-            ))}
-          </TextField>
+        <Box sx={{ overflowX: 'auto', mb: 2 }}>
+          <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
+            <TextField
+              label="Search"
+              variant="outlined"
+              size="small"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              sx={{ width: { xs: 220, sm: 260, md: 380 } }}
+            />
+            <TextField
+              label="Status Pesanan"
+              variant="outlined"
+              size="small"
+              select
+              value={statusFilter}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              sx={{ width: { xs: 180, sm: 200, md: 240 } }}
+            >
+              <MenuItem value="">Semua</MenuItem>
+              {statusOptions.map((opt) => (
+                <MenuItem key={opt} value={opt}>
+                  {opt}
+                </MenuItem>
+              ))}
+            </TextField>
+            <Box sx={{ flex: 1 }} />
+            <TableExportToolbar title="List SPK On Proses" tableRef={tableRef} fileBaseName="spk-on-proses" />
+          </Stack>
         </Box>
-        <TableExportToolbar title="List SPK On Proses" tableRef={tableRef} fileBaseName="spk-on-proses" />
         <TableContainer component={Paper} sx={{ width: "100%", overflowX: "auto" }}>
           <Table sx={{ minWidth: 3200 }} aria-label="spk-on-proses-table" ref={tableRef}>
             <TableHead>

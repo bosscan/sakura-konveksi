@@ -1,5 +1,5 @@
 import { useRef, useState } from "react";
-import { Box, Typography, TextField, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper } from "@mui/material";
+import { Box, Typography, TextField, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Paper, Stack } from "@mui/material";
 import TableExportToolbar from '../../../components/TableExportToolbar';
 
 // Data diambil dari ListSPKOnProses (sampel)
@@ -76,19 +76,23 @@ export default function CekProduksi() {
       <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold', textAlign: 'center' }}>
         Cek Status Pesanan
       </Typography>
-      <Box sx={{ display: 'flex', gap: 2, mb: 3, justifyContent: 'center' }}>
-        <TextField
-          label="Cari ID SPK / ID Transaksi / ID Custom"
-          variant="outlined"
-          size="small"
-          value={search}
-          onChange={(e) => setSearch(e.target.value)}
-          sx={{ minWidth: 300 }}
-        />
+      <Box sx={{ overflowX: 'auto', mb: 2 }}>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content', justifyContent: 'center' }}>
+          <TextField
+            label="Cari ID SPK / ID Transaksi / ID Custom"
+            variant="outlined"
+            size="small"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            sx={{ width: { xs: 260, sm: 320, md: 420 } }}
+          />
+          {search ? (
+            <TableExportToolbar title="Cek Status Produksi" tableRef={tableRef} fileBaseName="cek-status-produksi" />
+          ) : null}
+        </Stack>
       </Box>
       {search && (
         <>
-        <TableExportToolbar title="Cek Status Produksi" tableRef={tableRef} fileBaseName="cek-status-produksi" />
         <TableContainer component={Paper}>
           <Table ref={tableRef}>
             <TableHead>
