@@ -141,40 +141,46 @@ export default function InputSpesifikasi() {
                         {optionsError}
                     </Alert>
                 )} */}
-                <Grid container spacing={3} justifyContent="flex-start" alignItems="flex-start">
-                    <Grid size={6}>
+                <Grid container spacing={2} justifyContent="flex-start" alignItems="flex-start">
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Nama Desain :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Nama Desain :</Typography>
                             <TextField variant='outlined' size='small' value={nameDesign} onChange={(e) => setNameDesign(e.target.value)} sx={{flex: 1}}/>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180}}>Sample :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 }}}>Sample :</Typography>
                             <Select labelId='sample-select-label' size='small' value={sample} onChange={(e) => setSample(e.target.value)}>
                                 <MenuItem value='ADA'>Ada</MenuItem>
                                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Jenis Produk :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jenis Produk :</Typography>
                             <Select labelId='product-select-label' size='small' value={product} onChange={(e) => setProduct(e.target.value)}>
                                 <MenuItem value='JAKET'>Jaket</MenuItem>
                                 <MenuItem value='PDL/PDH'>PDL/PDH</MenuItem>
@@ -187,13 +193,15 @@ export default function InputSpesifikasi() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'flex-start',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Jenis Pola :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jenis Pola :</Typography>
                             <Select labelId='pattern-select-label' size='small' value={pattern} onChange={(e) => setPattern(e.target.value)} >
                                 <MenuItem value=''>Pilih Jenis Pola</MenuItem>
                                 <MenuItem value='KAOS'>Kaos</MenuItem>
@@ -215,14 +223,16 @@ export default function InputSpesifikasi() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Jenis Kain :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Jenis Kain :</Typography>
                             <Select labelId='fabric-select-label' size='small' value={fabric} onChange={(e) => setFabric(e.target.value)}>
                                 <MenuItem value='AMERICAN DRILL'>American Drill</MenuItem>
                                 <MenuItem value='HIROKAYA DRILL'>Hirokaya Drill</MenuItem>
@@ -241,36 +251,42 @@ export default function InputSpesifikasi() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Warna Kain :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Warna Kain :</Typography>
                             <TextField  size='small' value={fabricColor} onChange={(e) => setFabricColor(e.target.value)} sx={{flex: 1}} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Kombinasi Warna Kain :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Kombinasi Warna Kain :</Typography>
                             <TextField  size='small' value={colorCombination} onChange={(e) => setColorCombination(e.target.value)} sx={{flex: 1}} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                                 width: '100%',
                             }}>
-                            <Typography variant='body1' sx={{ minWidth: 180 }}>Kode Warna Kain :</Typography>
+                            <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Kode Warna Kain :</Typography>
                             <TextField  size='small' value={codeColor} onChange={(e) => setCodeColor(e.target.value)} sx={{flex: 1}}/>
                         </Box>
                     </Grid>
@@ -280,8 +296,9 @@ export default function InputSpesifikasi() {
                 display: 'flex',
                 justifyContent: 'space-between',
                 mt: 2,
+                width: '100%',
             }}>
-                <Button variant='contained' size='medium' sx={{ mr: 65 }} onClick={() => navigate('/market/input-desain/antrian-input')}>Kembali</Button>
+                <Button variant='contained' size='medium' onClick={() => navigate('/market/input-desain/antrian-input')}>Kembali</Button>
                 <Button variant='contained' size='medium' onClick={() => navigate('/market/input-desain/input-detail')}>Selanjutnya</Button>
             </Box>
         </Box>
