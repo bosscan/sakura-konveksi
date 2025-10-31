@@ -526,42 +526,48 @@ export default function DetailTambahan() {
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
                 width: '100%',
+                gap: 1,
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Lidah Kucing :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Lidah Kucing :</Typography>
               <Select labelId='product-select-label' size='small' value={catTongue} onChange={(e) => setCatTongue(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='PAKAI'>Pakai</MenuItem>
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
                 width: '100%',
+                gap: 1,
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Tempat Lanyard :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Tempat Lanyard :</Typography>
               <Select labelId='product-select-label' size='small' value={lanyardHolder} onChange={(e) => setLanyardHolder(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='PAKAI'>Pakai</MenuItem>
               </Select>
             </Box>
           </Grid>
-          <Grid size={6}>
+          <Grid size={{ xs: 12, md: 6 }}>
             <Box
               sx={{
                 display: 'flex',
-                alignItems: 'center',
+                alignItems: { xs: 'stretch', md: 'center' },
+                flexDirection: { xs: 'column', md: 'row' },
                 width: '100%',
+                gap: 1,
               }}>
-              <Typography variant='body1' sx={{ minWidth: 180 }}>Gantungan HT :</Typography>
+              <Typography variant='body1' sx={{ minWidth: { xs: 'auto', md: 180 } }}>Gantungan HT :</Typography>
               <Select labelId='product-select-label' size='small' value={HThanger} onChange={(e) => setHTHanger(e.target.value)}>
                 <MenuItem value='TIDAK'>Tidak</MenuItem>
                 <MenuItem value='DADA KIRI'>Dada Kiri</MenuItem>
