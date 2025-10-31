@@ -1,0 +1,40 @@
+#root {
+  max-width: 1280px;
+  margin: 0 auto;
+  padding: 0;
+  text-align: center;
+  height: 100%;
+  width: 100%;
+}
+
+.toolpad-app {
+  height: 100%;
+  width: 100%;
+}
+
+.toolpad-layout-root {
+  height: 100vh;
+  width: 100vw;
+}
+
+/* App shell brand/logo sizing (scoped to internal app only) */
+.app-shell header.MuiAppBar-root .MuiToolbar-root {
+  min-height: 64px;
+}
+@media (min-width: 900px) {
+  .app-shell header.MuiAppBar-root .MuiToolbar-root {
+    min-height: 72px;
+  }
+}
+
+.app-shell header.MuiAppBar-root img[src="/logo-sakura.png"],
+.app-shell .app-shell-logo {
+  height: 64px;
+  width: auto;
+}
+@media (min-width: 900px) {
+  .app-shell header.MuiAppBar-root img[src="/logo-sakura.png"],
+  .app-shell .app-shell-logo {
+    height: 72px;
+  }
+}
