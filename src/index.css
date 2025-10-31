@@ -162,17 +162,6 @@ button:focus-visible {
     text-overflow: ellipsis;
   }
 
-  /* Table header: allow full wrapping so labels are fully readable (no ellipsis) */
-  .MuiTableHead-root .MuiTableCell-head {
-    white-space: normal !important;
-    overflow: visible;
-    text-overflow: unset;
-    display: block;
-    line-height: 1.2;
-    overflow-wrap: anywhere;
-    word-break: break-word;
-  }
-
   /* Opt-in class to wrap long text when needed inside a cell */
   .MuiTableCell-root .wrap {
     white-space: normal;
