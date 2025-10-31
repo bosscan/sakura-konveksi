@@ -302,7 +302,7 @@ function InputPesanan() {
             }}>
             <Box
                 sx={{
-                    width: '80%',
+                    width: { xs: '100%', md: '80%' },
                     height: '500',
                     borderRadius: 2,
                     boxShadow: 2,
@@ -314,29 +314,35 @@ function InputPesanan() {
                     mb: 2,
                     fontWeight: 'bold',
                 }}>Data Konsumen</Typography>
-                <Grid container spacing={3}>
-                    <Grid size={6}>
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Nama Konsumen:</Typography>
                             <TextField fullWidth size='small' value={name} onChange={(e) => setName(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Alamat Lengkap:</Typography>
                             <TextField fullWidth size='small' value={address} onChange={(e) => setAddress(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Pilih Provinsi:</Typography>
                             <Select value={province} onChange={(e) => setProvince(e.target.value as string)} displayEmpty fullWidth size='small'>
@@ -349,10 +355,12 @@ function InputPesanan() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Pilih Kabupaten:</Typography>
 
@@ -366,11 +374,13 @@ function InputPesanan() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box
                             sx={{
                                 display: 'flex',
-                                alignItems: 'center',
+                                alignItems: { xs: 'stretch', md: 'center' },
+                                flexDirection: { xs: 'column', md: 'row' },
+                                gap: 1,
                             }}>
                             <Typography variant="body1" sx={{ mr: 1 }}>Pilih Kecamatan:</Typography>
                             <Select value={district} onChange={(e) => setDistrict(e.target.value as string)} displayEmpty fullWidth size="small" disabled={!regency}>
@@ -382,10 +392,12 @@ function InputPesanan() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant="body1" sx={{ mr: 1 }}>Pilih Desa:</Typography>
                             <Select
@@ -405,19 +417,23 @@ function InputPesanan() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Nomer HP:</Typography>
                             <TextField fullWidth size='small' value={number} onChange={(e) => setNumber(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Konten:</Typography>
                             <Select
@@ -440,7 +456,7 @@ function InputPesanan() {
             <Box
                 sx={{
                     display: 'flex',
-                    width: '80%',
+                    width: { xs: '100%', md: '80%' },
                     height: '500',
                     borderRadius: 2,
                     boxShadow: 2,
@@ -451,28 +467,30 @@ function InputPesanan() {
                     mb: 3,
                     fontWeight: 'bold',
                 }}>Data Pesanan</Typography>
-                <Grid container spacing={3}>
-                    <Grid size={6}>
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Quantity:</Typography>
                             <TextField fullWidth size='small' value={quantity} onChange={(e) => setQuantity(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
-                            flexDirection: 'row'
+                            alignItems: { xs: 'flex-start', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' }
                         }}>
                             <Typography variant='body1'>Size:</Typography>
                             <RadioGroup
                                 aria-label='size'
                                 name='size'
                                 value={size}
-                                sx={{ flexDirection: 'row', ml: 2 }}
+                                sx={{ flexDirection: 'row', flexWrap: 'wrap', gap: 1, ml: { xs: 0, md: 2 } }}
                                 onChange={(e) => setSize(e.target.value)}>
                                 <FormControlLabel value='XS' control={<Radio />} label='XS' />
                                 <FormControlLabel value='S' control={<Radio />} label='S' />
@@ -489,25 +507,29 @@ function InputPesanan() {
                             </RadioGroup>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Nama :</Typography>
                             <TextField fullWidth size='small' value={nameset} onChange={(e) => setNameset(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Format Nama :</Typography>
                             <TextField fullWidth size='small' value={formatName} onChange={(e) => setFormatName(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={3}>
+                    <Grid size={{ xs: 12, md: 3 }}>
                         <Button variant='contained' size='medium' onClick={handleAddItem}>Input Data</Button>
                     </Grid>
                 </Grid>
@@ -517,7 +539,7 @@ function InputPesanan() {
             <Box
                 sx={{
                     display: 'flex',
-                    width: '80%',
+                    width: { xs: '100%', md: '80%' },
                     height: '500',
                     borderRadius: 2,
                     boxShadow: 2,
@@ -571,7 +593,7 @@ function InputPesanan() {
             <Box
                 sx={{
                     display: 'flex',
-                    width: '80%',
+                    width: { xs: '100%', md: '80%' },
                     height: '500',
                     borderRadius: 2,
                     boxShadow: 2,
@@ -583,11 +605,13 @@ function InputPesanan() {
                     mb: 2,
                     fontWeight: 'bold',
                 }}>Data Transaksi</Typography>
-                <Grid container spacing={3}>
-                    <Grid size={6}>
+                <Grid container spacing={2}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Tipe Transaksi :</Typography>
                             <Select labelId='transaction' id='transaction' size='small' value={transaction} label='Tipe Transaksi' onChange={(e) => setTransaction(e.target.value)}>
@@ -597,19 +621,23 @@ function InputPesanan() {
                             </Select>
                         </Box>
                     </Grid>
-                    <Grid size={6}>
+                    <Grid size={{ xs: 12, md: 6 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Nominal Transaksi:</Typography>
                             <TextField fullWidth size='small' value={nominal} onChange={(e) => setNominal(e.target.value)} />
                         </Box>
                     </Grid>
-                    <Grid size={3}>
+                    <Grid size={{ xs: 12, md: 3 }}>
                         <Box sx={{
                             display: 'flex',
-                            alignItems: 'center',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
                         }}>
                             <Button
                                 variant='contained'
