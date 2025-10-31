@@ -162,15 +162,15 @@ button:focus-visible {
     text-overflow: ellipsis;
   }
 
-  /* Table header: allow wrapping to max 2 lines so labels stay readable */
+  /* Table header: allow full wrapping so labels are fully readable (no ellipsis) */
   .MuiTableHead-root .MuiTableCell-head {
     white-space: normal !important;
-    overflow: hidden;
-    text-overflow: clip;
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    line-height: 1.15;
+    overflow: visible;
+    text-overflow: unset;
+    display: block;
+    line-height: 1.2;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   /* Opt-in class to wrap long text when needed inside a cell */
