@@ -23,32 +23,33 @@ export default function StockBordir() {
             boxSizing: 'border-box',
             flexDirection: 'column',
         }}>
-            <Box sx={{
-                width: '80%',
+                        <Box sx={{
+                                width: { xs: '100%', md: '80%' },
                 height: '500',
                 display: 'flex',
                 borderRadius: 2,
                 boxShadow: 2,
                 flexDirection: 'column',
-                alignItems: 'center',
+                                alignItems: 'stretch',
                 p: 3,
                 mb: 3
             }}>
                 <Typography variant="h6" fontWeight={700}>Divisi Stock Bordir</Typography>
-                <TextField
-                required
-                id='lembar-stock-bordir'
-                label='Masukkan ID SPK'
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                onKeyDown={(e) => { if (e.key === 'Enter') goDetail(); }}
-                sx={{
-                    mt: 2,
-                    minWidth: 320
-                }} />
-                <Button sx={{mt: 2}} variant='contained' color='primary' disabled={!search.trim()} onClick={goDetail}>
-                    Kerjakan
-                </Button>
+                                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mt: 2 }}>
+                                    <TextField
+                                        required
+                                        id='lembar-stock-bordir'
+                                        label='Masukkan ID SPK'
+                                        size='small'
+                                        value={search}
+                                        onChange={(e) => setSearch(e.target.value)}
+                                        onKeyDown={(e) => { if (e.key === 'Enter') goDetail(); }}
+                                        sx={{ flex: 1, minWidth: 0 }}
+                                    />
+                                    <Button variant='contained' color='primary' disabled={!search.trim()} onClick={goDetail} sx={{ whiteSpace: 'nowrap' }}>
+                                        Kerjakan
+                                    </Button>
+                                </Box>
             </Box>
 
         </Box>);

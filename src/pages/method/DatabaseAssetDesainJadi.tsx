@@ -164,16 +164,17 @@ export default function DatabaseAssetDesainJadi() {
   return (
     <Box sx={{ p: 3 }}>
       <Typography variant="h6" sx={{ fontWeight: 700, mb: 1, textAlign: 'center' }}>Database Asset Desain Jadi</Typography>
-      <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1 }}>
+      <Box sx={{ overflowX: 'auto', mb: 1 }}>
+      <Stack direction="row" spacing={1} alignItems="center" sx={{ flexWrap: 'nowrap', width: 'max-content' }}>
         <TextField size="small" placeholder="Cari ID SPK / Nama Desain"
           value={query}
           onChange={(e)=>setQuery(e.target.value)}
           InputProps={{ startAdornment: <InputAdornment position="start"><SearchIcon /></InputAdornment> }}
-          sx={{ minWidth: 380 }}
+          sx={{ width: { xs: 220, sm: 260, md: 380 } }}
         />
         <TextField size="small" select label="Bagian Atribut" value={attrFilter}
           onChange={(e)=>setAttrFilter((e.target.value||'') as AttrKey | '')}
-          sx={{ width: 240 }}>
+          sx={{ width: { xs: 180, sm: 200, md: 240 } }}>
           <MenuItem value="">Semua</MenuItem>
           {ATTR_KEYS.map(k => <MenuItem key={k} value={k}>{ATTR_LABEL[k]}</MenuItem>)}
         </TextField>
@@ -181,6 +182,7 @@ export default function DatabaseAssetDesainJadi() {
         <Box sx={{ flex: 1 }} />
         <TableExportToolbar headers={exportHeaders} rows={exportRows} title="Database Asset Desain Jadi" fileBaseName="database-asset-desain" />
       </Stack>
+      </Box>
 
       <TableContainer component={Paper}>
         <Table size="small" stickyHeader ref={tableRef}>
