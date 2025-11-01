@@ -2,6 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
+import { initCloudStorageBridge } from './lib/cloudStorageBridge'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Layout from './layouts/Layout.tsx'
 import InputPesanan from './pages/market/InputPesanan.tsx'
@@ -345,6 +346,9 @@ const router = createBrowserRouter([
     Component: Landing,
   }
 ])
+
+// Ensure cloud sync is hydrated before first render (top-level await supported by Vite)
+await initCloudStorageBridge();
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
