@@ -60,10 +60,11 @@ export default function PlottingRekapBordir() {
     const key = 'plotting_rekap_bordir_queue';
     const refresh = async () => {
       try {
-        let list: any[] = [];
+        let apiList: any[] = [];
+        let localList: any[] = [];
         try {
-          const apiList = await Api.getPlottingQueue();
-          list = Array.isArray(apiList) ? apiList.map((x) => ({
+          const r = await Api.getPlottingQueue();
+          apiList = Array.isArray(r) ? r.map((x) => ({
             idSpk: x.id_spk,
             idTransaksi: x.id_transaksi,
             idRekapCustom: x.id_rekap_custom,
@@ -73,10 +74,30 @@ export default function PlottingRekapBordir() {
             statusDesain: 'Proses',
           })) : [];
         } catch {
-          const raw = localStorage.getItem(key);
-          list = raw ? JSON.parse(raw) : [];
+          apiList = [];
         }
-        // Load production recap mapping and helpers
+        try {
+          const raw = localStorage.getItem(key);
+          localList = raw ? JSON.parse(raw) : [];
+        } catch {
+          localList = [];
+        }
+
+        // Merge API + local (dedupe by idSpk, prefer API entries)
+        const unionByIdSpk = (a: any[], b: any[]) => {
+          const out: any[] = [];
+          const seen = new Set<string>();
+          // prefer API (a) then local (b)
+          [ ...(a || []), ...(b || []) ].forEach((it) => {
+            const id = String(it?.idSpk || '').trim();
+            if (!id || seen.has(id)) return;
+            seen.add(id);
+            out.push(it);
+          });
+          return out;
+        };
+        const list = unionByIdSpk(apiList, localList);
+  // Load production recap mapping and helpers
         const prRaw = localStorage.getItem('production_recap_map');
         const prMap: Record<string, any> = prRaw ? JSON.parse(prRaw) : {};
         const format7 = (v: any) => {
