@@ -107,7 +107,8 @@ export default function ListCPKOnProgress() {
                         Api.getPlottingQueue(),
                         Api.getDesignQueue(),
                     ]);
-                    pipeline = Array.isArray(pApi) ? pApi.map((x) => ({
+                    // Map API payloads to local shapes
+                    const pipelineApi = Array.isArray(pApi) ? pApi.map((x) => ({
                         idSpk: x.id_spk,
                         idTransaksi: x.id_transaksi,
                         idRekapCustom: x.id_rekap_custom,
@@ -126,12 +127,12 @@ export default function ListCPKOnProgress() {
                         selesaiStockNt: x.selesai_stock_no_transaksi,
                         selesaiPengiriman: x.selesai_pengiriman,
                     })) : [];
-                    rbList = Array.isArray(rbApi) ? rbApi.map((rb) => ({
+                    const rbApiList = Array.isArray(rbApi) ? rbApi.map((rb) => ({
                         rekapId: rb.rekap_id,
                         createdAt: rb.created_at,
                         items: (rb.items || []).map((it: any) => ({ idSpk: it.id_spk }))
                     })) : [];
-                    queue = Array.isArray(qApi) ? qApi.map((q) => ({
+                    const queueApi = Array.isArray(qApi) ? qApi.map((q) => ({
                         idSpk: q.id_spk,
                         idTransaksi: q.id_transaksi,
                         idRekapCustom: q.id_rekap_custom,
@@ -139,12 +140,54 @@ export default function ListCPKOnProgress() {
                         namaDesain: q.nama_desain,
                         kuantity: q.kuantity,
                     })) : [];
-                    adList = Array.isArray(dApi) ? dApi.map((d) => ({
+                    const adApiList = Array.isArray(dApi) ? dApi.map((d) => ({
                         idSpk: d.id_spk,
                         quantity: d.spk_quantity,
                         items: [],
                         tanggalInput: d.tanggal_input,
                     })) : [];
+
+                    // Also load local mirrors and merge (avoid losing local optimistic updates)
+                    const qKey = 'plotting_rekap_bordir_queue';
+                    const pipeKey = 'spk_pipeline';
+                    const rbKey = 'method_rekap_bordir';
+                    const adKey = 'antrian_input_desain';
+                    const qRawLocal = localStorage.getItem(qKey);
+                    const pRawLocal = localStorage.getItem(pipeKey);
+                    const rbRawLocal = localStorage.getItem(rbKey);
+                    const adRawLocal = localStorage.getItem(adKey);
+                    const queueLocal: any[] = qRawLocal ? JSON.parse(qRawLocal) : [];
+                    const pipelineLocal: any[] = pRawLocal ? JSON.parse(pRawLocal) : [];
+                    const rbLocal: any[] = rbRawLocal ? JSON.parse(rbRawLocal) : [];
+                    const adLocal: any[] = adRawLocal ? JSON.parse(adRawLocal) : [];
+
+                    const unionByIdSpk = (a: any[], b: any[]) => {
+                        const out: any[] = [];
+                        const seen = new Set<string>();
+                        [...a, ...b].forEach((it) => {
+                            const id = String(it?.idSpk || '').trim();
+                            if (!id || seen.has(id)) return;
+                            seen.add(id);
+                            out.push(it);
+                        });
+                        return out;
+                    };
+                    const unionByKey = (a: any[], b: any[], key: string) => {
+                        const out: any[] = [];
+                        const seen = new Set<string>();
+                        [...a, ...b].forEach((it) => {
+                            const id = String(it?.[key] || '').trim();
+                            if (!id || seen.has(id)) return;
+                            seen.add(id);
+                            out.push(it);
+                        });
+                        return out;
+                    };
+
+                    pipeline = unionByIdSpk(pipelineApi, pipelineLocal);
+                    queue = unionByIdSpk(queueApi, queueLocal);
+                    rbList = unionByKey(rbApiList, rbLocal, 'rekapId');
+                    adList = unionByIdSpk(adApiList, adLocal);
                 } catch {
                     const qKey = 'plotting_rekap_bordir_queue';
                     const pipeKey = 'spk_pipeline';

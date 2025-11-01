@@ -247,19 +247,20 @@ export default function Keranjang() {
                 const recapMap = allocateRecapForItems(items.map(it => ({ idSpk: it.idSpk, qty: it.kuantity })));
                 const itemsWithRecap = items.map(it => ({ ...it, idRekapProduksi: String(recapMap[it.idSpk]).padStart(7, '0') }));
 
-                try {
-                    await Api.postCheckout({ idTransaksi, items: itemsWithRecap });
-                } catch {
-                    // local fallback mirror
+                // 4.2) Optimistically update local plotting queue (so Market & Method pages refresh immediately)
+                {
                     const queueKey = 'plotting_rekap_bordir_queue';
                     const rawQ = localStorage.getItem(queueKey);
                     const plottingQueue: any[] = rawQ ? JSON.parse(rawQ) : [];
-                    const exists = new Set<string>((plottingQueue || []).map((p: any) => p?.idSpk).filter(Boolean));
+                    const exists = new Set<string>((plottingQueue || [])
+                      .map((p: any) => String(p?.idSpk || '').trim())
+                      .filter(Boolean));
                     itemsWithRecap.forEach((it) => {
-                        if (!it?.idSpk || exists.has(it.idSpk)) return;
-                        const src = spkInfo[it.idSpk] || {};
+                        const id = String(it?.idSpk || '').trim();
+                        if (!id || exists.has(id)) return;
+                        const src = spkInfo[id] || {};
                         plottingQueue.push({
-                            idSpk: it.idSpk,
+                            idSpk: id,
                             idTransaksi,
                             idRekapProduksi: it.idRekapProduksi,
                             idRekapCustom: it.idRekapCustom,
@@ -272,8 +273,16 @@ export default function Keranjang() {
                             kuantity: it.kuantity,
                             statusDesain: 'Proses',
                         });
+                        exists.add(id);
                     });
                     localStorage.setItem(queueKey, JSON.stringify(plottingQueue));
+                }
+
+                // 4.3) Best-effort server sync (no-op if backend unavailable)
+                try {
+                    await Api.postCheckout({ idTransaksi, items: itemsWithRecap });
+                } catch {
+                    // ignore; local state already updated
                 }
 
                 // 5) Persist mapping idSpk -> idTransaksi for all items in this checkout

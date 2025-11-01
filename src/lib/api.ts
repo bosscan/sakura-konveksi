@@ -1,3 +1,5 @@
+import { supabase } from './supabaseClient';
+
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 
 async function http(path: string, options: RequestInit = {}) {
@@ -25,8 +27,15 @@ export const Api = {
   async getPlottingQueue() {
     return http('/api/plotting-queue/');
   },
-  async postCheckout(payload: { idTransaksi: string; items: Array<{ idSpk: string; idRekapCustom?: string; idCustom?: string; namaDesain?: string; kuantity?: number; }> }) {
-    return http('/api/plotting-queue/checkout/', { method: 'POST', body: JSON.stringify(payload) });
+  async postCheckout(payload: { idTransaksi?: string; items: Array<{ idSpk: string; idRekapCustom?: string; idCustom?: string; namaDesain?: string; kuantity?: number; }> }) {
+    // Prefer Supabase RPC if available; fallback to existing HTTP endpoint for compatibility
+    try {
+      const { data, error } = await supabase.rpc('checkout_cart', { p_items: payload.items });
+      if (error) throw error;
+      return data;
+    } catch {
+      return http('/api/plotting-queue/checkout/', { method: 'POST', body: JSON.stringify(payload) });
+    }
   },
 
   // Rekap Bordir
