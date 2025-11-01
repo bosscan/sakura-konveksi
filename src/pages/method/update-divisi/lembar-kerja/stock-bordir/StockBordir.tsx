@@ -1,6 +1,7 @@
 import { Box, TextField, Typography, Button } from '@mui/material';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import BarcodeScanButton from '../../../../../components/BarcodeScanButton';
 
 export default function StockBordir() {
     const navigate = useNavigate();
@@ -8,6 +9,12 @@ export default function StockBordir() {
     const goDetail = () => {
         const spk = search.trim();
         if (!spk) return;
+        navigate(`/method/update-divisi/stock-bordir/detail-lembar-kerja?spk=${encodeURIComponent(spk)}`);
+    };
+    const handleDetected = (code: string) => {
+        const spk = String(code || '').trim();
+        if (!spk) return;
+        setSearch(spk);
         navigate(`/method/update-divisi/stock-bordir/detail-lembar-kerja?spk=${encodeURIComponent(spk)}`);
     };
 
@@ -49,6 +56,7 @@ export default function StockBordir() {
                                     <Button variant='contained' color='primary' disabled={!search.trim()} onClick={goDetail} sx={{ whiteSpace: 'nowrap' }}>
                                         Kerjakan
                                     </Button>
+                                    <BarcodeScanButton onDetected={handleDetected} label="Scan" />
                                 </Box>
             </Box>
 

@@ -1,6 +1,7 @@
 import { Box, TextField, Typography, Button } from '@mui/material';
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import BarcodeScanButton from '../../../../../components/BarcodeScanButton';
 
 export default function Produksi() {
     const navigate = useNavigate();
@@ -9,6 +10,12 @@ export default function Produksi() {
     const goDetail = () => {
         const spk = search.trim();
         if (!spk) return;
+        navigate(`/method/update-divisi/produksi/detail-lembar-kerja?spk=${encodeURIComponent(spk)}`);
+    };
+    const handleDetected = (code: string) => {
+        const spk = String(code || '').trim();
+        if (!spk) return;
+        setSearch(spk);
         navigate(`/method/update-divisi/produksi/detail-lembar-kerja?spk=${encodeURIComponent(spk)}`);
     };
 
@@ -50,6 +57,7 @@ export default function Produksi() {
                                     <Button variant='contained' color='primary' disabled={!search.trim()} onClick={goDetail} sx={{ whiteSpace: 'nowrap' }}>
                                         Kerjakan
                                     </Button>
+                                    <BarcodeScanButton onDetected={handleDetected} label="Scan" />
                                 </Box>
             </Box>
 
