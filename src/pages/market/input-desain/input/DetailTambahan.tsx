@@ -1,4 +1,4 @@
-import { Box, Button, Grid, Typography, TextField, Select, MenuItem, Modal, TableHead, TableContainer, Table, TableCell, TableRow, TableBody, Paper, FormControl, InputLabel, Snackbar, Alert } from '@mui/material'
+import { Box, Button, Grid, Typography, TextField, Select, MenuItem, Modal, TableHead, TableContainer, Table, TableCell, TableRow, TableBody, Paper, FormControl, InputLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import { useRef } from 'react'
 import TableExportToolbar from '../../../../components/TableExportToolbar'
 import { useEffect, useState } from 'react';
@@ -36,6 +36,7 @@ export default function DetailTambahan() {
   const [assetLink, setAssetLink] = useState('')
   const [catatan, setCatatan] = useState('')
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' });
+  const [openConfirmDesign, setOpenConfirmDesign] = useState(false);
 
   // Load and persist tambahan form so it survives navigation and can be used by Print SPK
   useEffect(() => {
@@ -872,13 +873,42 @@ export default function DetailTambahan() {
       </Box>
       <Box sx={{
         display: 'flex',
-        justifyContent: 'space-between',
+        flexDirection: { xs: 'column', md: 'row' },
+        alignItems: { xs: 'center', md: 'center' },
+        justifyContent: { xs: 'center', md: 'space-between' },
+        gap: 2,
         mt: 2,
       }}>
-        <Button variant='contained' size='medium' sx={{ mr: 65 }} onClick={() => navigate('/market/input-desain/input-detail')}>Kembali</Button>
-        <Button variant='contained' size='medium' color='primary' onClick={handleSubmitToQueue}>Simpan & Kirim ke Antrian</Button>
-
+        <Button
+          variant='contained'
+          size='medium'
+          onClick={() => navigate('/market/input-desain/input-detail')}
+          sx={{ alignSelf: { xs: 'flex-start', md: 'auto' } }}
+        >
+          Kembali
+        </Button>
+        <Button
+          variant='contained'
+          size='medium'
+          color='primary'
+          onClick={() => setOpenConfirmDesign(true)}
+          sx={{ minWidth: { xs: 260, md: 'auto' } }}
+        >
+          Simpan & Kirim ke Antrian
+        </Button>
       </Box>
+
+      {/* Konfirmasi simpan desain */}
+      <Dialog open={openConfirmDesign} onClose={() => setOpenConfirmDesign(false)}>
+        <DialogTitle>Konfirmasi</DialogTitle>
+        <DialogContent>
+          Apakah Anda yakin ingin menyimpan desain ini dan mengirimkannya ke antrian?
+        </DialogContent>
+        <DialogActions>
+          <Button variant='outlined' color='inherit' onClick={() => setOpenConfirmDesign(false)}>Batal</Button>
+          <Button variant='contained' color='primary' onClick={() => { setOpenConfirmDesign(false); handleSubmitToQueue(); }}>Ya, Simpan</Button>
+        </DialogActions>
+      </Dialog>
       <Snackbar
         open={snack.open}
         autoHideDuration={2500}

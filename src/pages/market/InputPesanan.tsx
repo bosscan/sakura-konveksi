@@ -1,4 +1,4 @@
-import { Box, Typography, Grid, TextField, RadioGroup, FormControlLabel, Radio, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Select, MenuItem, Snackbar, Alert } from '@mui/material'
+import { Box, Typography, Grid, TextField, RadioGroup, FormControlLabel, Radio, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Select, MenuItem, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
 import kvStore from '../../lib/kvStore'
 import { useNavigate } from 'react-router-dom'
@@ -10,6 +10,7 @@ function InputPesanan() {
     const navigate = useNavigate();
     const tableRef = useRef<HTMLTableElement | null>(null);
     const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' });
+    const [openConfirmSave, setOpenConfirmSave] = useState(false);
     // provinsi
     type Province = { id: string; name: string };
     const [provinces, setProvinces] = useState<Province[]>([]);
@@ -665,11 +666,23 @@ function InputPesanan() {
                             alignItems: 'center',
                             justifyContent: 'flex-end'
                         }}>
-                            <Button variant='contained' size='medium' onClick={handleSaveOrder}>Simpan Pesanan</Button>
+                            <Button variant='contained' size='medium' onClick={() => setOpenConfirmSave(true)}>Simpan Pesanan</Button>
                         </Box>
                     </Grid>
                 </Grid>
             </Box>
+
+            {/* Konfirmasi simpan pesanan */}
+            <Dialog open={openConfirmSave} onClose={() => setOpenConfirmSave(false)}>
+                <DialogTitle>Konfirmasi</DialogTitle>
+                <DialogContent>
+                    Apakah Anda yakin ingin menyimpan pesanan ini?
+                </DialogContent>
+                <DialogActions>
+                    <Button variant="outlined" color="inherit" onClick={() => setOpenConfirmSave(false)}>Batal</Button>
+                    <Button variant="contained" color="primary" onClick={() => { setOpenConfirmSave(false); handleSaveOrder(); }}>Ya, Simpan</Button>
+                </DialogActions>
+            </Dialog>
 
             <Snackbar open={snack.open} autoHideDuration={2500} onClose={() => setSnack(s => ({ ...s, open: false }))} anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}>
                 <Alert onClose={() => setSnack(s => ({ ...s, open: false }))} severity={snack.severity} variant='filled' sx={{ width: '100%' }}>
