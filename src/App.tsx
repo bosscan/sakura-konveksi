@@ -11,7 +11,8 @@ import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import { useEffect, useMemo, useState } from 'react';
 import { allowedMenusForRole, LS_KEYS, clearAuth } from './lib/auth';
 import kvStore from './lib/kvStore';
-import { Box } from '@mui/material';
+import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
+import GlobalLoader from './components/layout/GlobalLoader';
 
 const NAVIGATION = [
   {
@@ -592,6 +593,7 @@ function App() {
   const [session, setSession] = useState({})
   const [role, setRole] = useState<string | undefined>(undefined);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
+  const [openHomeConfirm, setOpenHomeConfirm] = useState(false);
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -705,19 +707,45 @@ function App() {
       // Show logo element instead of text title
       branding={{
         logo: (
-          <img
-            src="/logo-sakura.png"
-            alt="Sakura Konveksi"
-            className="app-shell-logo"
-            style={{ height: 64, width: 'auto' }}
-          />
+          <Box
+            component="button"
+            onClick={() => setOpenHomeConfirm(true)}
+            sx={{
+              background: 'none',
+              border: 'none',
+              p: 0,
+              cursor: 'pointer',
+              display: 'inline-flex',
+              alignItems: 'center',
+            }}
+          >
+            <img
+              src="/logo-sakura.png"
+              alt="Sakura Konveksi"
+              className="app-shell-logo"
+              style={{ height: 64, width: 'auto' }}
+            />
+          </Box>
         ),
         title: '',
-        homeUrl: '/landing',
+        // homeUrl intentionally omitted to allow custom confirm before navigating
       }}
     >
+      {/* Global loading overlay for all data fetches */}
+      <GlobalLoader />
       <Outlet />
     </AppProvider>
+    {/* Confirm navigate to landing */}
+    <Dialog open={openHomeConfirm} onClose={() => setOpenHomeConfirm(false)}>
+      <DialogTitle>Konfirmasi</DialogTitle>
+      <DialogContent>
+        <Typography>Anda yakin akan keluar ke landing page?</Typography>
+      </DialogContent>
+      <DialogActions>
+        <Button onClick={() => setOpenHomeConfirm(false)} color="inherit" variant="outlined">Batal</Button>
+        <Button onClick={() => { setOpenHomeConfirm(false); navigate('/landing'); }} color="primary" variant="contained">Ya</Button>
+      </DialogActions>
+    </Dialog>
     </Box>
   )
 }

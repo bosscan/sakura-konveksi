@@ -11,6 +11,7 @@ export const MENU = {
   MARKET: 'market',
   METHOD: 'method',
   MESIN: 'mesin',
+  MONEY: 'money',
   MATERIAL: 'material',
   MANPOWER: 'manpower',
 } as const;
@@ -20,7 +21,7 @@ export type MenuKey = typeof MENU[keyof typeof MENU];
 export const allowedMenusForRole = (role?: Role): MenuKey[] => {
   switch (role) {
     case ROLE.MANAGEMENT:
-      return [MENU.MARKET, MENU.METHOD, MENU.MESIN, MENU.MATERIAL, MENU.MANPOWER];
+      return [MENU.MARKET, MENU.METHOD, MENU.MESIN, MENU.MONEY, MENU.MATERIAL, MENU.MANPOWER];
     case ROLE.CS:
       return [MENU.MARKET, MENU.METHOD];
     case ROLE.ADMIN_PRODUKSI:

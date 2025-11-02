@@ -421,7 +421,7 @@ export default function AntrianPengerjaan() {
             flexDirection: 'column',
         }}>
             <Box sx={{
-                width: '80%',
+                width: { xs: '100%', md: '80%' },
                 borderRadius: 2,
                 boxShadow: 2,
                 flexDirection: 'column',
@@ -431,7 +431,7 @@ export default function AntrianPengerjaan() {
                 <Typography variant="h6" sx={{ mb: 2, fontWeight: 'bold' }}>Antrian Pengerjaan Desain</Typography>
                 <TableExportToolbar title="Antrian Pengerjaan" tableRef={tableRef} fileBaseName="antrian-pengerjaan" />
                 <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
-                    <Table sx={{ minWidth: 1250 }} aria-label="antrian-pengerjaan" ref={tableRef}>
+                    <Table sx={{ minWidth: { xs: 900, sm: 1100, md: 1250 } }} aria-label="antrian-pengerjaan" ref={tableRef}>
                         <TableHead>
                             <TableRow>
                                 <TableCell>No</TableCell>
@@ -444,7 +444,7 @@ export default function AntrianPengerjaan() {
                                 <TableCell>Nama CS</TableCell>
                                 <TableCell>Status Desain</TableCell>
                                 <TableCell>View Mockup</TableCell>
-                                <TableCell>Action</TableCell>
+                                <TableCell sx={{ minWidth: { xs: 180, sm: 240 } }}>Action</TableCell>
                             </TableRow>
                         </TableHead>
                         <TableBody>
@@ -463,6 +463,7 @@ export default function AntrianPengerjaan() {
                                     </TableCell>
                                     <TableCell>
                                         <Button
+                                            size="small"
                                             variant="outlined"
                                             onClick={() => {
                                                 setMockupUrl(row.mockupUrl);
@@ -473,31 +474,36 @@ export default function AntrianPengerjaan() {
                                         </Button>
                                     </TableCell>
                                     <TableCell>
-                                        <Button
-                                            variant="outlined"
-                                            color="warning"
-                                            sx={{ mr: 1 }}
-                                            onClick={() => {
-                                                setSelectedRow(index);
-                                                setOpenModal(true);
-                                            }}
-                                        >
-                                            Revisi
-                                        </Button>
-                                        <Button
-                                            variant="contained"
-                                            color="success"
-                                            disabled={row.status !== 'Selesai'}
-                                            onClick={() => {
-                                                if (row.status !== 'Selesai') {
-                                                    setSnack({ open: true, message: 'Validasi hanya tersedia untuk status Selesai', severity: 'info' });
-                                                    return;
-                                                }
-                                                handleValidasi(index)
-                                            }}
-                                        >
-                                            Validasi
-                                        </Button>
+                                        <Box sx={{ display: 'flex', flexDirection: { xs: 'column', sm: 'row' }, gap: 1 }}>
+                                            <Button
+                                                size="small"
+                                                variant="outlined"
+                                                color="warning"
+                                                onClick={() => {
+                                                    setSelectedRow(index);
+                                                    setOpenModal(true);
+                                                }}
+                                                sx={{ width: { xs: '100%', sm: 'auto' } }}
+                                            >
+                                                Revisi
+                                            </Button>
+                                            <Button
+                                                size="small"
+                                                variant="contained"
+                                                color="success"
+                                                disabled={row.status !== 'Selesai'}
+                                                onClick={() => {
+                                                    if (row.status !== 'Selesai') {
+                                                        setSnack({ open: true, message: 'Validasi hanya tersedia untuk status Selesai', severity: 'info' });
+                                                        return;
+                                                    }
+                                                    handleValidasi(index)
+                                                }}
+                                                sx={{ width: { xs: '100%', sm: 'auto' } }}
+                                            >
+                                                Validasi
+                                            </Button>
+                                        </Box>
                                     </TableCell>
                                 </TableRow>
                             ))}

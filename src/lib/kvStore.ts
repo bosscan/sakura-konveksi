@@ -1,4 +1,5 @@
 import { supabase } from './supabaseClient';
+import LoadingBus from './loadingBus';
 
 // Simple in-memory cache to prevent "blip to empty" when network hiccups occur.
 // We keep the last-known-good value for each key during the SPA session.
@@ -12,6 +13,7 @@ export const kvStore = {
 
   async get(key: string): Promise<any | null> {
     try {
+      LoadingBus.inc();
       const { data, error } = await supabase.from('kv_store').select('value').eq('key', key).single();
       if (error) {
         // On error, return last-known-good from memory if available
@@ -23,6 +25,8 @@ export const kvStore = {
     } catch (e) {
       // On exception, prefer last-known-good
       return memCache.has(key) ? memCache.get(key) : null;
+    } finally {
+      LoadingBus.dec();
     }
   },
 
