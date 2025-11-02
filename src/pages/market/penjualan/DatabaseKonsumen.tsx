@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import kvStore from '../../../lib/kvStore';
+import { Skeleton } from '@mui/material';
 import {
     Box,
     Table,
@@ -44,23 +45,30 @@ const DatabaseKonsumen: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>('');
+    const [loading, setLoading] = useState<boolean>(true);
 
     // Load data from kvStore only
     useEffect(() => {
         let mounted = true;
         const loadKonsumenData = async () => {
             try {
+                // warm from cache if available
                 let arr: any[] = [];
+                try {
+                    const cached = kvStore.peek('database_konsumen');
+                    if (cached) arr = Array.isArray(cached) ? cached : (cached ? JSON.parse(String(cached)) : []);
+                    if (arr.length) setKonsumenList(arr);
+                } catch {}
                 try { const raw = await kvStore.get('database_konsumen'); arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { arr = []; }
-                if (mounted) setKonsumenList(arr);
+                if (mounted) { setKonsumenList(arr); setLoading(false); }
             } catch (error) {
                 console.error('Error loading konsumen data:', error);
-                if (mounted) setAlert({ type: 'error', message: 'Gagal memuat data konsumen' });
+                if (mounted) { setAlert({ type: 'error', message: 'Gagal memuat data konsumen' }); setLoading(false); }
             }
         };
         loadKonsumenData();
         const sub = kvStore.subscribe('database_konsumen', (v: any) => {
-            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setKonsumenList(arr); } catch {}
+            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) { setKonsumenList(arr); setLoading(false); } } catch {}
         });
         return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
     }, []);
@@ -176,7 +184,17 @@ const DatabaseKonsumen: React.FC = () => {
                                 </TableRow>
                             </TableHead>
                             <TableBody>
-                                {filteredKonsumen
+                                {loading && filteredKonsumen.length === 0 ? (
+                                    Array.from({ length: 8 }).map((_, idx) => (
+                                        <TableRow key={`sk-${idx}`}>
+                                            <TableCell><Skeleton width={24} /></TableCell>
+                                            <TableCell><Skeleton width={200} /></TableCell>
+                                            <TableCell><Skeleton width={140} /></TableCell>
+                                            <TableCell><Skeleton width={260} /></TableCell>
+                                            <TableCell align="center"><Skeleton width={60} /></TableCell>
+                                        </TableRow>
+                                    ))
+                                ) : filteredKonsumen
                                     .slice(page * rowsPerPage, page * rowsPerPage + rowsPerPage)
                                     .map((konsumen, idx) => (
                                         <TableRow key={`${konsumen.telepon}-${konsumen.createdAt}`}>

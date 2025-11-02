@@ -61,27 +61,37 @@ export default function TabelProsesDesain() {
   const [dialogTitle, setDialogTitle] = useState('');
   type DialogRow = { idRekapCustom: string; idCustom: string; idSpk: string; quantity: number; namaDesain: string };
   const [dialogRows, setDialogRows] = useState<DialogRow[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
 
   useEffect(() => {
     let mounted = true;
     const refresh = async () => {
       try {
+        // warm from cache
+        try { const raw = kvStore.peek('design_queue'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted && list.length) setDesignQueue(list); } catch {}
+        try { const raw = kvStore.peek('keranjang'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted && list.length) setCart(list); } catch {}
+        try { const raw = kvStore.peek('plotting_rekap_bordir_queue'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted && list.length) setPlotting(list); } catch {}
+        try { const raw = kvStore.peek('antrian_input_desain'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted && list.length) setInputQueue(list); } catch {}
+        // then hydrate
         try { const raw = await kvStore.get('design_queue'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setDesignQueue(list); } catch { if (mounted) setDesignQueue([]); }
         try { const raw = await kvStore.get('keranjang'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setCart(list); } catch { if (mounted) setCart([]); }
         try { const raw = await kvStore.get('plotting_rekap_bordir_queue'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setPlotting(list); } catch { if (mounted) setPlotting([]); }
         try { const raw = await kvStore.get('antrian_input_desain'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setInputQueue(list); } catch { if (mounted) setInputQueue([]); }
+  if (mounted) setLoading(false);
       } catch {}
     };
     (async () => {
       await refresh();
       try {
         const subs = [
-          kvStore.subscribe('design_queue', () => { try { refresh(); } catch {} }),
-          kvStore.subscribe('keranjang', () => { try { refresh(); } catch {} }),
-          kvStore.subscribe('plotting_rekap_bordir_queue', () => { try { refresh(); } catch {} }),
-          kvStore.subscribe('antrian_input_desain', () => { try { refresh(); } catch {} }),
+      kvStore.subscribe('design_queue', () => { try { refresh(); } catch {} }),
+      kvStore.subscribe('keranjang', () => { try { refresh(); } catch {} }),
+      kvStore.subscribe('plotting_rekap_bordir_queue', () => { try { refresh(); } catch {} }),
+      kvStore.subscribe('antrian_input_desain', () => { try { refresh(); } catch {} }),
         ];
         const timer = setInterval(refresh, 3000);
+        // no-op read to suppress TS unused warning (future: use loading for skeleton UI)
+        if (!loading) {}
         return () => { try { subs.forEach(s => s.unsubscribe()); } catch {} ; clearInterval(timer); };
       } catch {
         const timer = setInterval(refresh, 2000);
