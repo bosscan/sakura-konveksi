@@ -5,6 +5,11 @@ import { supabase } from './supabaseClient';
 const memCache = new Map<string, any>();
 
 export const kvStore = {
+  // Return last-known-good value for a key without any network call.
+  peek(key: string): any | null {
+    return memCache.has(key) ? memCache.get(key) : null;
+  },
+
   async get(key: string): Promise<any | null> {
     try {
       const { data, error } = await supabase.from('kv_store').select('value').eq('key', key).single();

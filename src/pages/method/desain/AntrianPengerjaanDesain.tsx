@@ -1,4 +1,4 @@
-import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, Button } from "@mui/material";
+import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, Button, Skeleton } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
 import kvStore from '../../../lib/kvStore';
 import TableExportToolbar from "../../../components/TableExportToolbar";
@@ -21,20 +21,26 @@ export default function AntrianPengerjaanDesain() {
   const tableRef = useRef<HTMLTableElement | null>(null);
   const navigate = useNavigate();
   const [rows, setRows] = useState<QueueItem[]>([]);
+  const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     let mounted = true;
     const load = async () => {
       try {
+        // Warm start from memory cache when available
+        const cached = kvStore.peek('design_queue');
+        if (cached) {
+          try { const list: QueueItem[] = Array.isArray(cached) ? cached : JSON.parse(String(cached)); setRows(list); setLoading(false); } catch {}
+        }
         const raw = await kvStore.get('design_queue');
         const list: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
-        if (mounted) setRows(list);
-      } catch { if (mounted) setRows([]); }
+        if (mounted) { setRows(list); setLoading(false); }
+      } catch { if (mounted) { setRows([]); setLoading(false); } }
     };
     load();
     try {
       const sub = kvStore.subscribe('design_queue', (v) => {
-        try { const list: QueueItem[] = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setRows(list); } catch { }
+        try { const list: QueueItem[] = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) { setRows(list); setLoading(false); } } catch { }
       });
       return () => { try { sub.unsubscribe(); } catch {} };
     } catch {}
@@ -67,7 +73,22 @@ export default function AntrianPengerjaanDesain() {
               </TableRow>
             </TableHead>
             <TableBody>
-              {rows.map((row, index) => (
+              {loading && rows.length === 0 ? (
+                Array.from({ length: 6 }).map((_, idx) => (
+                  <TableRow key={`s-${idx}`}>
+                    <TableCell><Skeleton width={24} /></TableCell>
+                    <TableCell><Skeleton width={160} /></TableCell>
+                    <TableCell><Skeleton width={120} /></TableCell>
+                    <TableCell><Skeleton width={160} /></TableCell>
+                    <TableCell><Skeleton width={120} /></TableCell>
+                    <TableCell><Skeleton width={120} /></TableCell>
+                    <TableCell><Skeleton width={140} /></TableCell>
+                    <TableCell><Skeleton width={100} /></TableCell>
+                    <TableCell><Skeleton width={80} /></TableCell>
+                    <TableCell><Skeleton width={90} /></TableCell>
+                  </TableRow>
+                ))
+              ) : rows.map((row, index) => (
                 <TableRow key={`${row.idRekapCustom}-${row.idSpk || index}`}>
                   <TableCell>{index + 1}</TableCell>
                   <TableCell>{row.idRekapCustom}</TableCell>
@@ -84,7 +105,7 @@ export default function AntrianPengerjaanDesain() {
                   </TableCell>
                 </TableRow>
               ))}
-              {rows.length === 0 && (
+              {!loading && rows.length === 0 && (
                 <TableRow>
                   <TableCell colSpan={10} align="center">Tidak ada antrian</TableCell>
                 </TableRow>
