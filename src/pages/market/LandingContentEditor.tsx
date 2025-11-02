@@ -25,11 +25,12 @@ import AddIcon from '@mui/icons-material/Add';
 import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { LANDING_IMAGES, SOCIAL_LINKS } from '../../lib/landingConfig';
+import kvStore from '../../lib/kvStore';
 import { getObjectUrl, getObjectUrls, saveFiles } from '../../lib/landingStore';
 
 // Storage keys
 const K = {
-  // For large images we only store KEYS (ids) in localStorage, blobs live in IndexedDB
+  // For large images we only store KEYS (ids) via kvStore; blobs live in IndexedDB
   imagesKeys: 'landing_images_keys',
   katalog: 'landing_katalog', // items may contain imageKey
   testimonials: 'landing_testimonials',
@@ -45,17 +46,6 @@ type PriceItem = { name: string; price: string; description?: string };
 
 type SocialLinks = typeof SOCIAL_LINKS;
 
-function readLS<T>(key: string, fallback: T): T {
-  try {
-    const v = localStorage.getItem(key);
-    if (!v) return fallback;
-    const parsed = JSON.parse(v);
-    return parsed as T;
-  } catch {
-    return fallback;
-  }
-}
-
 // Frontend-only: store images as Blobs in IndexedDB and return generated ids (keys)
 async function uploadFilesGetKeys(files: FileList | null): Promise<string[]> {
   if (!files || files.length === 0) return [];
@@ -68,10 +58,10 @@ export default function LandingContentEditor() {
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' });
 
   // Slider images: keys persisted; urls resolved for preview
-  const [imageKeys, setImageKeys] = useState<string[]>(() => readLS<string[]>(K.imagesKeys, []));
+  const [imageKeys, setImageKeys] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
-  // Backward fallback for old saved URLs or default images
-  const legacyImages = readLS<string[]>('landing_images', LANDING_IMAGES);
+  // Default images if no keys are set
+  const legacyImages = LANDING_IMAGES;
 
   useEffect(() => {
     let active = true;
@@ -87,27 +77,27 @@ export default function LandingContentEditor() {
   }, [imageKeys]);
 
   // Katalog
-  const [katalog, setKatalog] = useState<KatalogItem[]>(() => readLS<KatalogItem[]>(K.katalog, [
+  const [katalog, setKatalog] = useState<KatalogItem[]>([
     { title: 'Jaket Varsity', description: 'Bahan premium, sablon/bordir rapi', image: LANDING_IMAGES[0] },
     { title: 'Jaket Hoodie', description: 'Nyaman dipakai harian', image: LANDING_IMAGES[1] },
     { title: 'Jaket Coach', description: 'Ringan dan stylish', image: LANDING_IMAGES[2] },
-  ]));
+  ]);
 
   // Testimonials
-  const [testimonials, setTestimonials] = useState<Testimonial[]>(() => readLS<Testimonial[]>(K.testimonials, [
+  const [testimonials, setTestimonials] = useState<Testimonial[]>([
     { name: 'Pelanggan #1', quote: 'Respon cepat, hasil jahit rapi, pengiriman tepat waktu.' },
     { name: 'Pelanggan #2', quote: 'Kualitas premium dan pelayanan ramah.' },
-  ]));
+  ]);
 
   // Price list
-  const [prices, setPrices] = useState<PriceItem[]>(() => readLS<PriceItem[]>(K.prices, [
+  const [prices, setPrices] = useState<PriceItem[]>([
     { name: 'Varsity', price: 'Mulai 250K', description: 'Free konsultasi desain' },
     { name: 'Hoodie', price: 'Mulai 200K', description: 'Minimal order fleksibel' },
     { name: 'Coach', price: 'Mulai 230K', description: 'Harga transparan' },
-  ]));
+  ]);
 
   // Gallery
-  const [galleryKeys, setGalleryKeys] = useState<string[]>(() => readLS<string[]>(K.galleryKeys, []));
+  const [galleryKeys, setGalleryKeys] = useState<string[]>([]);
   const [galleryUrls, setGalleryUrls] = useState<Record<string, string>>({});
 
   useEffect(() => {
@@ -121,20 +111,48 @@ export default function LandingContentEditor() {
   }, [galleryKeys]);
 
   // Social links
-  const [socials, setSocials] = useState<SocialLinks>(() => readLS<SocialLinks>(K.socials, SOCIAL_LINKS));
+  const [socials, setSocials] = useState<SocialLinks>(SOCIAL_LINKS);
+
+  // Hydrate from kvStore and subscribe to external changes
+  useEffect(() => {
+    let mounted = true;
+    const hydrate = async () => {
+      try {
+        const [ik, kat, test, pr, gk, soc] = await Promise.all([
+          kvStore.get(K.imagesKeys),
+          kvStore.get(K.katalog),
+          kvStore.get(K.testimonials),
+          kvStore.get(K.prices),
+          kvStore.get(K.galleryKeys),
+          kvStore.get(K.socials),
+        ]);
+        if (!mounted) return;
+        if (Array.isArray(ik)) setImageKeys(ik as string[]);
+        if (Array.isArray(kat)) setKatalog(kat as KatalogItem[]);
+        if (Array.isArray(test)) setTestimonials(test as Testimonial[]);
+        if (Array.isArray(pr)) setPrices(pr as PriceItem[]);
+        if (Array.isArray(gk)) setGalleryKeys(gk as string[]);
+        if (soc && typeof soc === 'object') setSocials(soc as SocialLinks);
+      } catch {}
+    };
+    hydrate();
+    const subs = [K.imagesKeys, K.katalog, K.testimonials, K.prices, K.galleryKeys, K.socials]
+      .map((key) => kvStore.subscribe(key, () => { try { hydrate(); } catch {} }));
+    return () => { mounted = false; subs.forEach(s => { try { s.unsubscribe(); } catch {} }); };
+  }, []);
 
   const saveAll = async () => {
     try {
       setSaving(true);
       // Simulate micro-task flush and ensure no UI lock
       await Promise.resolve();
-  // Persist only keys, blobs stay in IndexedDB
-  localStorage.setItem(K.imagesKeys, JSON.stringify(imageKeys));
-      localStorage.setItem(K.katalog, JSON.stringify(katalog));
-      localStorage.setItem(K.testimonials, JSON.stringify(testimonials));
-      localStorage.setItem(K.prices, JSON.stringify(prices));
-  localStorage.setItem(K.galleryKeys, JSON.stringify(galleryKeys));
-      localStorage.setItem(K.socials, JSON.stringify(socials));
+      // Persist only keys and structured data; blobs stay in IndexedDB
+      try { await kvStore.set(K.imagesKeys, imageKeys); } catch {}
+      try { await kvStore.set(K.katalog, katalog); } catch {}
+      try { await kvStore.set(K.testimonials, testimonials); } catch {}
+      try { await kvStore.set(K.prices, prices); } catch {}
+      try { await kvStore.set(K.galleryKeys, galleryKeys); } catch {}
+      try { await kvStore.set(K.socials, socials); } catch {}
       setSnack({ open: true, message: 'Perubahan berhasil disimpan.', severity: 'success' });
     } catch (e) {
       const isQuota = (e as any)?.name === 'QuotaExceededError' || (e as any)?.code === 22;

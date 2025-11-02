@@ -2,6 +2,7 @@ import { Box, Typography, Paper, TableContainer, TableHead, TableRow, TableCell,
 import { useEffect, useMemo, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { markSelesai, isSpkInDivisionQueue } from "../../../../../lib/pipelineHelpers";
+import { kvStore } from "../../../../../lib/kvStore";
 
 export default function LembarBordir() {
     type AnyRec = Record<string, any>;
@@ -18,99 +19,107 @@ export default function LembarBordir() {
     const [mockupUrl, setMockupUrl] = useState<string>('');
     const [items, setItems] = useState<Array<{ size?: string; nama?: string; formatNama?: string }>>([]);
     const [spes, setSpes] = useState<{ product?: string; pattern?: string; fabric?: string; fabricColor?: string; colorCombination?: string }>({});
-
-    // Helpers to read localStorage safely
-    const loadLs = <T = any,>(key: string, fallback: T): T => {
-        try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : fallback; } catch { return fallback; }
-    };
-
     useEffect(() => {
-        if (!spkId) {
-            setMockupUrl('');
-            setItems([]);
-            setSpes({});
-            setRowChecks([]);
-            return;
-        }
-
-        // Gate: must be in Bordir queue
-        if (!isSpkInDivisionQueue(spkId, 'bordir')) {
-            setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-            navigate('/method/update-divisi/bordir/antrian');
-            return;
-        }
-
-    // 1) Items (size/nama/formatNama) from antrian_input_desain by idSpk, fallback ke snapshot spk_orders[idSpk]
-    const antrian: AnyRec[] = loadLs('antrian_input_desain', [] as AnyRec[]);
-    const spkOrdersMap: Record<string, AnyRec> = loadLs('spk_orders', {} as Record<string, AnyRec>);
-    const antrianItem = antrian.find((x: AnyRec) => String(x?.idSpk ?? '').trim() === spkId) || spkOrdersMap[spkId];
-    const itemList = Array.isArray(antrianItem?.items) ? (antrianItem!.items as AnyRec[]) : [];
-        setItems(itemList);
-        setRowChecks(itemList.map(() => false));
-
-        // 2) Mockup image and worksheet: prefer spk_design snapshot, then design_queue/antrian_pengerjaan_desain, then thumbnail map
-        let designSnapMap: Record<string, AnyRec> = loadLs('spk_design', {} as Record<string, AnyRec>);
-        let snap = designSnapMap[spkId];
-    const designQueue: AnyRec[] = loadLs('design_queue', [] as AnyRec[]);
-        const antrianDesain: AnyRec[] = loadLs('antrian_pengerjaan_desain', [] as AnyRec[]);
-        const design = designQueue.find((d: AnyRec) => String(d?.idSpk ?? '').trim() === spkId);
-        const designNext = antrianDesain.find((d: AnyRec) => String(d?.idSpk ?? '').trim() === spkId);
-
-        // Priority: PRA-PRODUKSI upload (design_queue / antrian desain) -> snapshot -> thumbnail map -> assets/link
-        let resolvedMock: string | undefined =
-            design?.worksheet?.mockup?.file ||
-            designNext?.worksheet?.mockup?.file ||
-            undefined;
-        if (!resolvedMock) {
-            const snapshotHasMock = !!(snap?.worksheet?.mockup?.file || snap?.mockupUrl);
-            if (snapshotHasMock) resolvedMock = snap?.worksheet?.mockup?.file || snap?.mockupUrl;
-        }
-        if (!resolvedMock) {
-            // Fallback to thumbnail map via queueId
-            const rawT = localStorage.getItem('mockup_thumb_map');
-            const thumbMap = rawT ? (() => { try { return JSON.parse(rawT); } catch { return {}; } })() : {};
-            let qid = (design as AnyRec)?.queueId || (designNext as AnyRec)?.queueId;
-            if (!qid) {
-                // Legacy mapping idSpk -> queueId
-                try {
-                    const r2 = localStorage.getItem('design_queueid_by_spk');
-                    const m2 = r2 ? JSON.parse(r2) : {};
-                    qid = m2?.[spkId];
-                } catch {}
+        let mounted = true;
+        const load = async () => {
+            if (!spkId) {
+                setMockupUrl('');
+                setItems([]);
+                setSpes({});
+                setRowChecks([]);
+                return;
             }
-            // Heuristik namaDesain: cari di design_queue berdasarkan nameDesign dari form jika mapping kosong
-            if (!qid) {
-                try {
-                    const formDetail: AnyRec | null = loadLs('inputDetailForm', null as any);
-                    const candName = String(formDetail?.nameDesign || '').trim();
-                    if (candName) {
-                        const found = [...(designQueue || [])].reverse().find(q => String(q?.namaDesain || '').trim().toLowerCase() === candName.toLowerCase());
-                        if (found?.queueId) qid = found.queueId;
+
+            // Gate: must be in Bordir queue
+            if (!isSpkInDivisionQueue(spkId, 'bordir')) {
+                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
+                navigate('/method/update-divisi/bordir/antrian');
+                return;
+            }
+
+            try {
+                const [antrianRaw, spkOrdersRaw, designSnapRaw, designQueueRaw, antrianDesainRaw, thumbMapRaw, designQueueIdRaw, inputDetailRaw, inputProdukRaw] = await Promise.all([
+                    kvStore.get('antrian_input_desain').catch(() => null),
+                    kvStore.get('spk_orders').catch(() => null),
+                    kvStore.get('spk_design').catch(() => null),
+                    kvStore.get('design_queue').catch(() => null),
+                    kvStore.get('antrian_pengerjaan_desain').catch(() => null),
+                    kvStore.get('mockup_thumb_map').catch(() => null),
+                    kvStore.get('design_queueid_by_spk').catch(() => null),
+                    kvStore.get('inputDetailForm').catch(() => null),
+                    kvStore.get('inputProdukForm').catch(() => null),
+                ]);
+
+                const antrian: AnyRec[] = Array.isArray(antrianRaw) ? antrianRaw : (antrianRaw ? JSON.parse(String(antrianRaw)) : []);
+                const spkOrdersMap: Record<string, AnyRec> = spkOrdersRaw && typeof spkOrdersRaw === 'object' ? spkOrdersRaw as any : (spkOrdersRaw ? JSON.parse(String(spkOrdersRaw)) : {});
+                const antrianItem = antrian.find((x: AnyRec) => String(x?.idSpk ?? '').trim() === spkId) || spkOrdersMap[spkId];
+                const itemList = Array.isArray(antrianItem?.items) ? (antrianItem!.items as AnyRec[]) : [];
+                if (mounted) { setItems(itemList); setRowChecks(itemList.map(() => false)); }
+
+                const designSnapMap: Record<string, AnyRec> = designSnapRaw && typeof designSnapRaw === 'object' ? designSnapRaw as any : (designSnapRaw ? JSON.parse(String(designSnapRaw)) : {});
+                const snap = designSnapMap[spkId];
+                const designQueue: AnyRec[] = Array.isArray(designQueueRaw) ? designQueueRaw : (designQueueRaw ? JSON.parse(String(designQueueRaw)) : []);
+                const antrianDesain: AnyRec[] = Array.isArray(antrianDesainRaw) ? antrianDesainRaw : (antrianDesainRaw ? JSON.parse(String(antrianDesainRaw)) : []);
+                const design = designQueue.find((d: AnyRec) => String(d?.idSpk ?? '').trim() === spkId);
+                const designNext = antrianDesain.find((d: AnyRec) => String(d?.idSpk ?? '').trim() === spkId);
+
+                let resolvedMock: string | undefined =
+                    design?.worksheet?.mockup?.file ||
+                    designNext?.worksheet?.mockup?.file ||
+                    undefined;
+                if (!resolvedMock) {
+                    const snapshotHasMock = !!(snap?.worksheet?.mockup?.file || snap?.mockupUrl);
+                    if (snapshotHasMock) resolvedMock = snap?.worksheet?.mockup?.file || snap?.mockupUrl;
+                }
+                if (!resolvedMock) {
+                    const thumbMap = thumbMapRaw && typeof thumbMapRaw === 'object' ? thumbMapRaw : (thumbMapRaw ? JSON.parse(String(thumbMapRaw)) : {});
+                    let qid = (design as AnyRec)?.queueId || (designNext as AnyRec)?.queueId;
+                    if (!qid) {
+                        try {
+                            const m2 = designQueueIdRaw && typeof designQueueIdRaw === 'object' ? designQueueIdRaw : (designQueueIdRaw ? JSON.parse(String(designQueueIdRaw)) : {});
+                            qid = m2?.[spkId];
+                        } catch {}
                     }
-                } catch {}
+                    if (!qid) {
+                        try {
+                            const formDetail: AnyRec | null = inputDetailRaw && typeof inputDetailRaw === 'object' ? inputDetailRaw : (inputDetailRaw ? JSON.parse(String(inputDetailRaw)) : null);
+                            const candName = String(formDetail?.nameDesign || '').trim();
+                            if (candName) {
+                                const found = [...(designQueue || [])].reverse().find(q => String(q?.namaDesain || '').trim().toLowerCase() === candName.toLowerCase());
+                                if (found?.queueId) qid = found.queueId;
+                            }
+                        } catch {}
+                    }
+                    if (qid && thumbMap[qid]) resolvedMock = thumbMap[qid];
+                }
+                if (!resolvedMock && snap) {
+                    const fromAssets = Array.isArray(snap?.assets) ? snap.assets.find((a: any) => String(a?.attribute||'').toLowerCase().includes('mockup'))?.file : undefined;
+                    resolvedMock = fromAssets || snap?.assetLink || resolvedMock;
+                }
+
+                if (mounted) setMockupUrl(resolvedMock || '');
+
+                const formDetail: AnyRec | null = inputDetailRaw && typeof inputDetailRaw === 'object' ? inputDetailRaw : (inputDetailRaw ? JSON.parse(String(inputDetailRaw)) : null);
+                const formProduk: AnyRec | null = inputProdukRaw && typeof inputProdukRaw === 'object' ? inputProdukRaw : (inputProdukRaw ? JSON.parse(String(inputProdukRaw)) : null);
+                const S = (k: string) => ((snap?.[k]) ?? (formProduk?.[k]) ?? (formDetail?.[k]) ?? '') as string;
+                if (mounted) setSpes({
+                    product: (snap?.product || formDetail?.product || '') as string,
+                    pattern: (snap?.pattern || formProduk?.pattern || formDetail?.pattern || '') as string,
+                    fabric: (snap?.fabric || formProduk?.fabric || formDetail?.fabric || '') as string,
+                    fabricColor: (snap?.fabricColor || formProduk?.fabricColor || formDetail?.fabricColor || '') as string,
+                    colorCombination: (S('colorCombination') || formDetail?.colorCombination || '') as string,
+                });
+            } catch {
+                if (mounted) {
+                    setItems([]);
+                    setRowChecks([]);
+                    setMockupUrl('');
+                    setSpes({});
+                }
+                setSnack({ open: true, message: 'Gagal memuat data lembar bordir.', severity: 'error' });
             }
-            if (qid && thumbMap[qid]) resolvedMock = thumbMap[qid];
-        }
-        if (!resolvedMock && snap) {
-            const fromAssets = Array.isArray(snap?.assets) ? snap.assets.find((a: any) => String(a?.attribute||'').toLowerCase().includes('mockup'))?.file : undefined;
-            resolvedMock = fromAssets || snap?.assetLink || resolvedMock;
-        }
-
-        // Ensure worksheet carried over even if mockup absent
-    // carry worksheet implicitly via design snapshots; not displayed directly here
-        setMockupUrl(resolvedMock || '');
-
-        // 3) Spesifikasi Produk from design snapshot or input forms
-        const formDetail: AnyRec | null = loadLs('inputDetailForm', null as any);
-        const formProduk: AnyRec | null = loadLs('inputProdukForm', null as any);
-        const S = (k: string) => ((snap?.[k]) ?? (formProduk?.[k]) ?? (formDetail?.[k]) ?? '') as string;
-        setSpes({
-            product: (snap?.product || formDetail?.product || '') as string,
-            pattern: (snap?.pattern || formProduk?.pattern || formDetail?.pattern || '') as string,
-            fabric: (snap?.fabric || formProduk?.fabric || formDetail?.fabric || '') as string,
-            fabricColor: (snap?.fabricColor || formProduk?.fabricColor || formDetail?.fabricColor || '') as string,
-            colorCombination: (S('colorCombination') || formDetail?.colorCombination || '') as string,
-        });
+        };
+        load();
     }, [spkId]);
 
     const handleConfirm = async () => {
@@ -170,7 +179,7 @@ export default function LembarBordir() {
                         <Card>
                             <CardContent>
                                 <Typography variant="body1" fontWeight={600}>View Mockup:</Typography>
-                                {/* Mockup image resolved from localStorage queues/snapshots */}
+                                {/* Mockup image resolved from kvStore-backed queues/snapshots */}
                                 <Box sx={{
                                     mt: 1,
                                     width: '100%',

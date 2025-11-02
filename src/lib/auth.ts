@@ -43,22 +43,23 @@ export const LS_KEYS = {
   REMEMBER_USERNAME: 'remember_username',
   USER_ROLE: 'user_role',
 };
+import kvStore from './kvStore';
 
-export const saveAuth = (role: Role, username?: string, rememberUsername?: boolean) => {
+export const saveAuth = async (role: Role, username?: string, rememberUsername?: boolean) => {
   try {
-    localStorage.setItem(LS_KEYS.IS_AUTH, 'true');
-    localStorage.setItem(LS_KEYS.USER_ROLE, role);
-    if (rememberUsername && username) localStorage.setItem(LS_KEYS.REMEMBER_USERNAME, username);
-    if (!rememberUsername) localStorage.removeItem(LS_KEYS.REMEMBER_USERNAME);
+    await kvStore.set(LS_KEYS.IS_AUTH, 'true');
+    await kvStore.set(LS_KEYS.USER_ROLE, role);
+    if (rememberUsername && username) await kvStore.set(LS_KEYS.REMEMBER_USERNAME, username);
+    if (!rememberUsername) await kvStore.remove(LS_KEYS.REMEMBER_USERNAME);
     return true;
   } catch {
     return false;
   }
 };
 
-export const clearAuth = () => {
+export const clearAuth = async () => {
   try {
-    localStorage.removeItem(LS_KEYS.IS_AUTH);
-    localStorage.removeItem(LS_KEYS.USER_ROLE);
+    await kvStore.remove(LS_KEYS.IS_AUTH);
+    await kvStore.remove(LS_KEYS.USER_ROLE);
   } catch {}
 };

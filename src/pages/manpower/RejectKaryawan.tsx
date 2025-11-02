@@ -1,19 +1,42 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import TableExportToolbar from '../../components/TableExportToolbar';
 import Grid from '@mui/material/GridLegacy';
+import kvStore from '../../lib/kvStore';
 
 type Reject = { id: string; date: string; name: string; count: number; reason: string; note?: string };
 const STORAGE_KEY = 'mp_rejects';
 
 export default function RejectKaryawan() {
-	const [rows, setRows] = useState<Reject[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+	const [rows, setRows] = useState<Reject[]>([]);
 	const [form, setForm] = useState<Omit<Reject,'id'>>({ date:new Date().toISOString().slice(0,10), name:'', count:0, reason:'', note:'' });
 	const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
 	const [search, setSearch] = useState('');
 	const handleChange = (k:keyof typeof form, v:any)=> setForm(f=>({...f,[k]:v}));
-	const save = (list:Reject[])=>{ setRows(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
-	const add = ()=>{ if(!form.name) return; const next:Reject = { id: crypto.randomUUID(), ...form }; save([next, ...rows]); setForm({ date:new Date().toISOString().slice(0,10), name:'', count:0, reason:'', note:'' }); };
+
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get(STORAGE_KEY);
+				if (!mounted) return;
+				setRows(Array.isArray(raw) ? raw as Reject[] : []);
+			} catch {
+				if (mounted) setRows([]);
+			}
+			try {
+				const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+					setRows(Array.isArray(v) ? (v as Reject[]) : []);
+				});
+				return () => { mounted = false; sub?.unsubscribe?.(); };
+			} catch {
+				return () => { mounted = false; };
+			}
+		})();
+	}, []);
+
+	const save = async (list:Reject[])=>{ setRows(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
+	const add = async ()=>{ if(!form.name) return; const next:Reject = { id: crypto.randomUUID(), ...form }; await save([next, ...rows]); setForm({ date:new Date().toISOString().slice(0,10), name:'', count:0, reason:'', note:'' }); };
 	const filtered = useMemo(()=> rows.filter(r => r.date.startsWith(month) && [r.name,r.reason,r.note||''].join(' ').toLowerCase().includes(search.toLowerCase())), [rows, month, search]);
 	const totals = useMemo(()=> filtered.reduce((acc,r)=> acc + r.count, 0), [filtered]);
 	const tableRef = useRef<HTMLTableElement | null>(null);

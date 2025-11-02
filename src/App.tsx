@@ -10,6 +10,7 @@ import InventoryIcon from '@mui/icons-material/Inventory';
 import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
 import { useEffect, useMemo, useState } from 'react';
 import { allowedMenusForRole, LS_KEYS, clearAuth } from './lib/auth';
+import kvStore from './lib/kvStore';
 import { Box } from '@mui/material';
 
 const NAVIGATION = [
@@ -589,6 +590,7 @@ const NAVIGATION = [
 
 function App() {
   const [session, setSession] = useState({})
+  const [role, setRole] = useState<string | undefined>(undefined);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const navigate = useNavigate()
   const location = useLocation()
@@ -619,13 +621,13 @@ function App() {
     return addExpandedState(NAVIGATION);
   }, [expandedItems]);
 
-  // Filter navigation based on role stored in localStorage
+  // Filter navigation based on role stored in kvStore
   const navigationFiltered = useMemo(() => {
     try {
-      const role = localStorage.getItem(LS_KEYS.USER_ROLE) as any;
+      const currentRole = role as any;
       // management should see everything
-      if (!role) return navigationWithExpanded;
-      const allowed = allowedMenusForRole(role);
+      if (!currentRole) return navigationWithExpanded;
+      const allowed = allowedMenusForRole(currentRole);
 
       const mapSegment = (segment: string) => {
         // normalize segment names to match MENU keys in auth
@@ -648,14 +650,28 @@ function App() {
   }, [navigationWithExpanded]);
 
   useEffect(() => {
-    const isAuthenticated = localStorage.getItem('isAuthenticated')
-    if (isAuthenticated) {
-      const userData = {}
-      setSession({ user: userData })
-    } else {
-      // For unauthenticated users, show the public landing page first
-      navigate('/landing')
-    }
+    let mounted = true;
+    (async () => {
+      try {
+        const [authVal, roleVal] = await Promise.all([
+          kvStore.get(LS_KEYS.IS_AUTH),
+          kvStore.get(LS_KEYS.USER_ROLE),
+        ]);
+        if (!mounted) return;
+        const authed = !!authVal;
+        setRole(typeof roleVal === 'string' ? roleVal : undefined);
+        if (authed) {
+          const userData = {}
+          setSession({ user: userData })
+        } else {
+          navigate('/landing')
+        }
+      } catch {
+        navigate('/landing');
+      }
+    })();
+    const subR = kvStore.subscribe(LS_KEYS.USER_ROLE, (v) => { try { setRole(typeof v === 'string' ? v : undefined); } catch {} });
+    return () => { mounted = false; try { subR.unsubscribe(); } catch {} };
   }, [])
 
   const authentication = useMemo(() => ({
@@ -664,8 +680,7 @@ function App() {
       // Example: setUser({}); setSession({ user: {} });
     },
     signOut: async () => {
-      try { clearAuth(); } catch {}
-      localStorage.removeItem('isAuthenticated')
+      try { await clearAuth(); } catch {}
       setSession({})
       // Redirect to public landing after sign out
       navigate('/landing')

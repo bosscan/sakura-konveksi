@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography, Grid, TextField, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter } from '@mui/material';
 import { PieChart } from '@mui/x-charts/PieChart';
 import TableExportToolbar from '../../../components/TableExportToolbar';
+import kvStore from '../../../lib/kvStore';
 
 type Row = {
   id: number;
@@ -21,19 +22,34 @@ const currency = (n: number) => n.toLocaleString('id-ID');
 const OmsetHarian: React.FC = () => {
   const [date, setDate] = useState<string>('');
   const tableRef = useRef<HTMLTableElement | null>(null);
-  const [version, setVersion] = useState(0);
+  const [records, setRecords] = useState<Array<{ tanggal: string; tipeTransaksi: string; nominal: number }>>([]);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (e.key === 'omset_pendapatan') setVersion(v => v + 1); };
-    window.addEventListener('storage', onStorage);
-    const t = setInterval(() => setVersion(v => v + 1), 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get('omset_pendapatan');
+        const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setRecords(list);
+      } catch { if (mounted) setRecords([]); }
+    };
+    (async () => {
+      await refresh();
+      try {
+        const sub = kvStore.subscribe('omset_pendapatan', () => { try { refresh(); } catch {} });
+        const t = setInterval(refresh, 3000);
+        return () => { try { sub.unsubscribe(); } catch {}; clearInterval(t); };
+      } catch {
+        const t = setInterval(refresh, 2000);
+        return () => clearInterval(t);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const filtered = useMemo(() => {
     if (!date) return [] as Row[];
-    const raw = localStorage.getItem('omset_pendapatan');
-    const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = raw ? JSON.parse(raw) : [];
+    const list = records || [];
     const ymd = date;
     const day = list.filter(r => (r.tanggal || '').slice(0, 10) === ymd);
     const slotDp = day.filter(r => r.tipeTransaksi?.toLowerCase() === 'dp').length;
@@ -55,7 +71,7 @@ const OmsetHarian: React.FC = () => {
       omsetKumulatif: omsetDp + omsetPelunasan + omsetDpl,
     };
     return day.length ? [row] : [];
-  }, [date, version]);
+  }, [date, records]);
 
   const totals = useMemo(() => {
     return filtered.reduce(

@@ -1,4 +1,5 @@
 import { Box, Button, Paper, Stack, TextField, Typography, Table, TableBody, TableCell, TableContainer, TableHead, TableRow } from "@mui/material";
+import kvStore from "../../lib/kvStore";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useMemo, useRef, useState } from "react";
@@ -49,23 +50,28 @@ export default function CetakInvoicePelunasan() {
   };
 
   const fetchRecord = () => {
-    try {
-      const raw = localStorage.getItem('invoice_records');
-      const map = raw ? JSON.parse(raw) : {};
-      const rec = map[invoiceNoQuery];
-      if (!rec) {
-        alert('Nomor invoice tidak ditemukan.');
+    (async () => {
+      try {
+        let map: Record<string, any> = {};
+        try {
+          const raw = await (kvStore.get as any)('invoice_records');
+          map = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
+        } catch {}
+        const rec = map[invoiceNoQuery];
+        if (!rec) {
+          alert('Nomor invoice tidak ditemukan.');
+          setRecord(null);
+          setReady(false);
+          return;
+        }
+        setRecord(rec);
+        setReady(true);
+      } catch {
+        alert('Gagal membaca data invoice.');
         setRecord(null);
         setReady(false);
-        return;
       }
-      setRecord(rec);
-      setReady(true);
-    } catch {
-      alert('Gagal membaca data invoice.');
-      setRecord(null);
-      setReady(false);
-    }
+    })();
   };
 
   const rows = useMemo(() => {

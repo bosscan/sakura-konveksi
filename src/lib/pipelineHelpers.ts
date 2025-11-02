@@ -1,4 +1,5 @@
 import Api from './api';
+import kvStore from './kvStore';
 
 /**
  * Mark a pipeline item as finished for given division.
@@ -19,8 +20,8 @@ export async function markSelesai(spkId: string, backendField: string, localFiel
     // ignore, try local fallback
   }
   try {
-    const raw = localStorage.getItem('spk_pipeline');
-    const list: any[] = raw ? JSON.parse(raw) : [];
+    const raw = await kvStore.get('spk_pipeline');
+    const list: any[] = Array.isArray(raw) ? raw : [];
     const now = new Date().toISOString();
     for (const it of list) {
       if ((it?.idSpk || '').trim() === id) {
@@ -30,7 +31,7 @@ export async function markSelesai(spkId: string, backendField: string, localFiel
         }
       }
     }
-    if (updated) localStorage.setItem('spk_pipeline', JSON.stringify(list));
+    if (updated) await kvStore.set('spk_pipeline', list);
   } catch {
     // ignore storage errors
   }
@@ -56,13 +57,34 @@ export type DivisionKey =
  * This mirrors the filtering logic used in DivisionAntrianTable (simplified
  * for grouping divisions like stock-no-transaksi/pengiriman).
  */
+// In-memory cache of spk_pipeline to allow synchronous checks in UI without
+// changing consumers. Hydrated from kvStore and kept up-to-date via subscribe.
+let pipelineCache: any[] = [];
+let pipelineCacheInitialized = false;
+
+async function initPipelineCache() {
+  if (pipelineCacheInitialized) return;
+  pipelineCacheInitialized = true;
+  try {
+    const raw = await kvStore.get('spk_pipeline');
+    pipelineCache = Array.isArray(raw) ? raw : [];
+  } catch {
+    pipelineCache = [];
+  }
+  try {
+    kvStore.subscribe('spk_pipeline', (v) => {
+      try { pipelineCache = Array.isArray(v) ? v : (v ? [v] : []); } catch { pipelineCache = []; }
+    });
+  } catch {}
+}
+
+// Synchronous check using pipelineCache. Ensure initialization kicked off.
 export function isSpkInDivisionQueue(spkId: string, division: DivisionKey): boolean {
+  if (!pipelineCacheInitialized) void initPipelineCache();
   const id = (spkId || '').trim();
   if (!id) return false;
   try {
-    const raw = localStorage.getItem('spk_pipeline');
-    const list: any[] = raw ? JSON.parse(raw) : [];
-    const it = list.find((x) => (x?.idSpk || '').trim() === id);
+    const it = pipelineCache.find((x) => (x?.idSpk || '').trim() === id);
     if (!it) return false;
     const done = (k: string) => Boolean(it?.[k]);
 
@@ -70,7 +92,6 @@ export function isSpkInDivisionQueue(spkId: string, division: DivisionKey): bool
       case 'desain-produksi':
         return !done('selesaiDesainProduksi');
       case 'cutting-pola':
-        // masuk cutting ketika belum selesai cutting (tidak perlu cek sebelumnya di sini)
         return !done('selesaiCuttingPola');
       case 'stock-bordir':
         return done('selesaiDesainProduksi') && done('selesaiCuttingPola') && !done('selesaiStockBordir');
@@ -87,10 +108,8 @@ export function isSpkInDivisionQueue(spkId: string, division: DivisionKey): bool
       case 'foto-produk':
         return done('selesaiFinishing') && !done('selesaiFotoProduk');
       case 'stock-no-transaksi':
-        // Simplified: item has finished Foto Produk but belum Pengiriman
         return done('selesaiFotoProduk') && !done('selesaiPengiriman');
       case 'pengiriman':
-        // Eligible when Foto Produk selesai dan belum dikirim
         return done('selesaiFotoProduk') && !done('selesaiPengiriman');
       default:
         return false;

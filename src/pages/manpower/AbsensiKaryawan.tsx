@@ -1,19 +1,42 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, MenuItem } from '@mui/material';
 import Grid from '@mui/material/GridLegacy';
 import TableExportToolbar from '../../components/TableExportToolbar';
+import kvStore from '../../lib/kvStore';
 
 type Attendance = { id: string; date: string; name: string; status: 'Hadir'|'Izin'|'Sakit'|'Alpa'; note?: string };
 const STORAGE_KEY = 'mp_absensi';
 
 export default function AbsensiKaryawan() {
-	const [rows, setRows] = useState<Attendance[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+	const [rows, setRows] = useState<Attendance[]>([]);
 	const [form, setForm] = useState<Omit<Attendance,'id'>>({ date:new Date().toISOString().slice(0,10), name:'', status:'Hadir', note:'' });
 	const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
 	const [search, setSearch] = useState('');
 	const handleChange = (k:keyof typeof form, v:any)=> setForm(f=>({...f,[k]:v}));
-	const save = (list:Attendance[])=>{ setRows(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
-	const add = ()=>{ if(!form.name) return; const next:Attendance = { id: crypto.randomUUID(), ...form }; save([next, ...rows]); setForm({ date:new Date().toISOString().slice(0,10), name:'', status:'Hadir', note:'' }); };
+
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get(STORAGE_KEY);
+				if (!mounted) return;
+				setRows(Array.isArray(raw) ? raw as Attendance[] : []);
+			} catch {
+				if (mounted) setRows([]);
+			}
+			try {
+				const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+					setRows(Array.isArray(v) ? (v as Attendance[]) : []);
+				});
+				return () => { mounted = false; sub?.unsubscribe?.(); };
+			} catch {
+				return () => { mounted = false; };
+			}
+		})();
+	}, []);
+
+	const save = async (list:Attendance[])=>{ setRows(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
+	const add = async ()=>{ if(!form.name) return; const next:Attendance = { id: crypto.randomUUID(), ...form }; await save([next, ...rows]); setForm({ date:new Date().toISOString().slice(0,10), name:'', status:'Hadir', note:'' }); };
 	const filtered = useMemo(()=> rows.filter(r => r.date.startsWith(month) && [r.name,r.status,r.note||''].join(' ').toLowerCase().includes(search.toLowerCase())), [rows, month, search]);
 	const totals = useMemo(()=> filtered.reduce((acc,r)=>{ acc[r.status] = (acc[r.status]||0)+1; return acc; }, {} as Record<Attendance['status'], number>), [filtered]);
 	const tableRef = useRef<HTMLTableElement | null>(null);

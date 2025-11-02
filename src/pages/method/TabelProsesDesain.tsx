@@ -1,5 +1,6 @@
 import { Box, Typography, Table, TableHead, TableRow, TableCell, TableBody, Paper, TableContainer, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import kvStore from '../../lib/kvStore';
 
 type DesignQueueItem = {
   idRekapCustom: string;
@@ -62,31 +63,32 @@ export default function TabelProsesDesain() {
   const [dialogRows, setDialogRows] = useState<DialogRow[]>([]);
 
   useEffect(() => {
-    const refresh = () => {
+    let mounted = true;
+    const refresh = async () => {
       try {
-        const qRaw = localStorage.getItem('design_queue');
-        setDesignQueue(qRaw ? JSON.parse(qRaw) : []);
-      } catch { setDesignQueue([]); }
-      try {
-        const kRaw = localStorage.getItem('keranjang');
-        setCart(kRaw ? JSON.parse(kRaw) : []);
-      } catch { setCart([]); }
-      try {
-        const pRaw = localStorage.getItem('plotting_rekap_bordir_queue');
-        setPlotting(pRaw ? JSON.parse(pRaw) : []);
-      } catch { setPlotting([]); }
-      try {
-        const aRaw = localStorage.getItem('antrian_input_desain');
-        setInputQueue(aRaw ? JSON.parse(aRaw) : []);
-      } catch { setInputQueue([]); }
+        try { const raw = await kvStore.get('design_queue'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setDesignQueue(list); } catch { if (mounted) setDesignQueue([]); }
+        try { const raw = await kvStore.get('keranjang'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setCart(list); } catch { if (mounted) setCart([]); }
+        try { const raw = await kvStore.get('plotting_rekap_bordir_queue'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setPlotting(list); } catch { if (mounted) setPlotting([]); }
+        try { const raw = await kvStore.get('antrian_input_desain'); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setInputQueue(list); } catch { if (mounted) setInputQueue([]); }
+      } catch {}
     };
-    refresh();
-    const onStorage = (e: StorageEvent) => {
-      if (e.key === 'design_queue' || e.key === 'keranjang' || e.key === 'plotting_rekap_bordir_queue' || e.key === 'antrian_input_desain') refresh();
-    };
-    window.addEventListener('storage', onStorage);
-    const timer = setInterval(refresh, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    (async () => {
+      await refresh();
+      try {
+        const subs = [
+          kvStore.subscribe('design_queue', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('keranjang', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('plotting_rekap_bordir_queue', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('antrian_input_desain', () => { try { refresh(); } catch {} }),
+        ];
+        const timer = setInterval(refresh, 3000);
+        return () => { try { subs.forEach(s => s.unsubscribe()); } catch {} ; clearInterval(timer); };
+      } catch {
+        const timer = setInterval(refresh, 2000);
+        return () => clearInterval(timer);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const rows: Row[] = useMemo(() => {

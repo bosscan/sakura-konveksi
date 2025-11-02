@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import kvStore from '../../../lib/kvStore';
 import {
     Box,
     Table,
@@ -43,25 +44,25 @@ export default function SebaranWilayah() {
     const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>('');
 
-    // Load data dari localStorage
+    // Load data from kvStore and subscribe
     useEffect(() => {
-        loadSebaranData();
-    }, []);
-
-    const loadSebaranData = () => {
-        try {
-            const storedData = localStorage.getItem('database_sebaran');
-            if (storedData) {
-                setSebaranList(JSON.parse(storedData));
-            } else {
-                setSebaranList([]);
-                localStorage.setItem('database_sebaran', JSON.stringify([]));
+        let mounted = true;
+        const load = async () => {
+            try {
+                let arr: any[] = [];
+                try { const raw = await kvStore.get('database_sebaran'); arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { arr = []; }
+                if (mounted) setSebaranList(arr);
+            } catch (e) {
+                console.error('Error loading sebaran data:', e);
+                if (mounted) setAlert({ type: 'error', message: 'Gagal memuat data sebaran' });
             }
-        } catch (error) {
-            console.error('Error loading sebaran data:', error);
-            setAlert({ type: 'error', message: 'Gagal memuat data sebaran' });
-        }
-    };
+        };
+        load();
+        const sub = kvStore.subscribe('database_sebaran', (v: any) => {
+            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setSebaranList(arr); } catch {}
+        });
+        return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+    }, []);
 
     const filteredSebaran = sebaranList.filter(sebaran =>{
         const matchSearch =

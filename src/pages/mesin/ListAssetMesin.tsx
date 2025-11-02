@@ -1,26 +1,48 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, MenuItem, Stack } from '@mui/material';
 import { useRef } from 'react';
 import TableExportToolbar from '../../components/TableExportToolbar';
 import Grid from '@mui/material/GridLegacy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import kvStore from '../../lib/kvStore';
 
 type Machine = { id: string; code: string; name: string; brand: string; model: string; location: string; status: 'Aktif'|'Tidak Aktif'|'Maintenance'; lastService?: string; nextService?: string; };
 const STORAGE_KEY = 'mesin_assets';
 
 export default function ListAssetMesin() {
 	const tableRef = useRef<HTMLTableElement | null>(null);
-	const [items, setItems] = useState<Machine[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+	const [items, setItems] = useState<Machine[]>([]);
 	const [search, setSearch] = useState('');
 	const [form, setForm] = useState<Omit<Machine,'id'>>({ code:'', name:'', brand:'', model:'', location:'', status:'Aktif', lastService:'', nextService:'' });
 	const [editing, setEditing] = useState<Machine | null>(null);
 
-	const save = (list:Machine[])=>{ setItems(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get(STORAGE_KEY);
+				if (!mounted) return;
+				setItems(Array.isArray(raw) ? raw as Machine[] : []);
+			} catch {
+				if (mounted) setItems([]);
+			}
+			try {
+				const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+					setItems(Array.isArray(v) ? (v as Machine[]) : []);
+				});
+				return () => { mounted = false; sub?.unsubscribe?.(); };
+			} catch {
+				return () => { mounted = false; };
+			}
+		})();
+	}, []);
+
+	const save = async (list:Machine[])=>{ setItems(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
 	const handleChange = (k:keyof typeof form, v:any)=> setForm(f=>({...f,[k]:v}));
-	const add = ()=>{ if(!form.code || !form.name) return; const next: Machine = { id: crypto.randomUUID(), ...form }; save([next, ...items]); setForm({ code:'', name:'', brand:'', model:'', location:'', status:'Aktif', lastService:'', nextService:'' }); };
-	const remove = (id:string)=> save(items.filter(i=>i.id!==id));
-	const commitEdit = ()=> { if(!editing) return; const updated = items.map(i=> i.id===editing.id? editing: i); save(updated); setEditing(null); };
+	const add = async ()=>{ if(!form.code || !form.name) return; const next: Machine = { id: crypto.randomUUID(), ...form }; await save([next, ...items]); setForm({ code:'', name:'', brand:'', model:'', location:'', status:'Aktif', lastService:'', nextService:'' }); };
+	const remove = async (id:string)=> { await save(items.filter(i=>i.id!==id)); };
+	const commitEdit = async ()=> { if(!editing) return; const updated = items.map(i=> i.id===editing.id? editing: i); await save(updated); setEditing(null); };
 	const filtered = useMemo(()=> items.filter(i => [i.code,i.name,i.brand,i.model,i.location,i.status].join(' ').toLowerCase().includes(search.toLowerCase())), [items, search]);
 
 	return (

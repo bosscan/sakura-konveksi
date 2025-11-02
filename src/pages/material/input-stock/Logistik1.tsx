@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, TextField, Paper, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, IconButton, MenuItem } from '@mui/material';
 import Grid from '@mui/material/GridLegacy';
 import TableExportToolbar from '../../../components/TableExportToolbar';
@@ -19,16 +19,24 @@ type StockItem = {
 };
 
 const STORAGE_KEY = 'material_logistik1';
+import kvStore from '../../../lib/kvStore';
 
 export default function Logistik1() {
-  const [items, setItems] = useState<StockItem[]>(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch {
-      return [];
-    }
-  });
+  const [items, setItems] = useState<StockItem[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const raw = await kvStore.get(STORAGE_KEY);
+        const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setItems(list as StockItem[]);
+      } catch { if (mounted) setItems([]); }
+    })();
+    const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+      try { if (Array.isArray(v)) setItems(v as StockItem[]); } catch {}
+    });
+    return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+  }, []);
 
   const [form, setForm] = useState<Omit<StockItem, 'id'>>({
     date: new Date().toISOString().slice(0, 10),
@@ -45,19 +53,19 @@ export default function Logistik1() {
 
   const handleChange = (k: keyof typeof form, v: any) => setForm((f) => ({ ...f, [k]: v }));
 
-  const addItem = () => {
+  const addItem = async () => {
     if (!form.name) return;
     const next: StockItem = { id: crypto.randomUUID(), ...form } as StockItem;
     const updated = [next, ...items];
     setItems(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    try { await kvStore.set(STORAGE_KEY, updated); } catch {}
     setForm((f) => ({ ...f, code: '', name: '', qtyIn: 0, qtyOut: 0, price: 0, supplier: '', note: '' }));
   };
 
-  const removeItem = (id: string) => {
+  const removeItem = async (id: string) => {
     const updated = items.filter((i) => i.id !== id);
     setItems(updated);
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(updated));
+    try { await kvStore.set(STORAGE_KEY, updated); } catch {}
   };
 
   const totalValue = useMemo(() => items.reduce((acc, it) => acc + (it.qtyIn - it.qtyOut) * it.price, 0), [items]);

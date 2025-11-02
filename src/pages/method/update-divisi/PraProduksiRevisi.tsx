@@ -1,6 +1,7 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, Button, Dialog, AppBar, Toolbar, IconButton, TextField, MenuItem, Stack, Snackbar, Alert, Chip } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import { useEffect, useRef, useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 
 type AssetBlock = { file: string | null; ukuran: string; jarak: string; keterangan: string };
 type Worksheet = {
@@ -44,20 +45,14 @@ export default function PraProduksiRevisi() {
     };
   };
 
-  const persistDesignQueue = (list: QueueItem[]) => {
+  const persistDesignQueue = async (list: QueueItem[]) => {
     try {
-      localStorage.setItem('design_queue', JSON.stringify(list));
+      await kvStore.set('design_queue', list);
       return true;
     } catch (err) {
       try {
-        const raw = localStorage.getItem('design_queue');
-        const existing: QueueItem[] = raw ? JSON.parse(raw) : [];
-        const shrunk = existing.map((it) => ({ ...it, worksheet: it.worksheet ? sanitizeWorksheet(it.worksheet) : undefined }));
-        localStorage.setItem('design_queue', JSON.stringify(shrunk));
-      } catch {}
-      try {
         const shrunkList = list.map((it) => ({ ...it, worksheet: it.worksheet ? sanitizeWorksheet(it.worksheet) : undefined }));
-        localStorage.setItem('design_queue', JSON.stringify(shrunkList));
+        await kvStore.set('design_queue', shrunkList);
         return true;
       } catch {
         return false;
@@ -93,19 +88,24 @@ export default function PraProduksiRevisi() {
   };
 
   useEffect(() => {
-    const refresh = () => {
-      const raw = localStorage.getItem('design_queue');
-      const list: QueueItem[] = raw ? JSON.parse(raw) : [];
-      let mutated = false;
-      for (const it of list) { if (!it.queueId) { (it as any).queueId = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`); mutated = true; } }
-      if (mutated) { try { localStorage.setItem('design_queue', JSON.stringify(list)); } catch {} }
-      setRows(list.filter(it => it.status === 'Antrian revisi'));
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get('design_queue');
+        const list: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        // ensure queueIds
+        let mutated = false;
+        for (const it of list) {
+          if (!it.queueId) { (it as any).queueId = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`); mutated = true; }
+        }
+        if (mutated) { try { await kvStore.set('design_queue', list); } catch {} }
+        if (mounted) setRows(list.filter(it => it.status === 'Antrian revisi'));
+      } catch { if (mounted) setRows([]); }
     };
     refresh();
-    const onStorage = (e: StorageEvent) => { if (e.key === 'design_queue') refresh(); };
-    window.addEventListener('storage', onStorage);
-    const timer = setInterval(refresh, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    const unsub = kvStore.subscribe('design_queue', () => { try { refresh(); } catch {} });
+    const timer = setInterval(refresh, 6000);
+    return () => { mounted = false; try { (unsub as any)?.unsubscribe?.(); } catch {} clearInterval(timer); };
   }, []);
 
   const openWorksheet = (rekapId: string, idSpk?: string) => {
@@ -129,54 +129,65 @@ export default function PraProduksiRevisi() {
 
   const persist = (list: QueueItem[]) => persistDesignQueue(list);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!active) return;
-    const all = JSON.parse(localStorage.getItem('design_queue') || '[]');
-    const safeWs = sanitizeWorksheet(ws, catatan);
-    const updAll = all.map((it: QueueItem) => (it.idRekapCustom === active.idRekapCustom && String(it.idSpk || '') === String((active as any).idSpk || '')) ? { ...it, status, worksheet: safeWs } : it);
-    const ok = persist(updAll);
-    if (!ok) { setSnack({ open: true, message: 'Gagal menyimpan perubahan', severity: 'error' }); return; }
-    // save thumbnail to map if available
     try {
-      if (active.queueId && ws?.mockup?.file) {
-        const mapKey = 'mockup_thumb_map';
-        const rawMap = localStorage.getItem(mapKey);
-        const thumbMap = rawMap ? JSON.parse(rawMap) : {};
-        thumbMap[active.queueId] = ws.mockup.file;
-        localStorage.setItem(mapKey, JSON.stringify(thumbMap));
-      }
-    } catch {}
-    setRows(updAll.filter((x: QueueItem) => x.status === 'Antrian revisi'));
-    setOpen(false); setActive(null);
-    setSnack({ open: true, message: 'Worksheet revisi disimpan', severity: 'success' });
+      const raw = await kvStore.get('design_queue');
+      const all: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+      const safeWs = sanitizeWorksheet(ws, catatan);
+      const updAll = all.map((it: QueueItem) => (it.idRekapCustom === active.idRekapCustom && String(it.idSpk || '') === String((active as any).idSpk || '')) ? { ...it, status, worksheet: safeWs } : it);
+      const ok = await persist(updAll);
+      if (!ok) { setSnack({ open: true, message: 'Gagal menyimpan perubahan', severity: 'error' }); return; }
+      // save thumbnail to map if available
+      try {
+        if (active.queueId && ws?.mockup?.file) {
+          const mapKey = 'mockup_thumb_map';
+          const rawMap = await kvStore.get(mapKey);
+          const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap as Record<string, string> : (rawMap ? JSON.parse(String(rawMap)) : {});
+          thumbMap[active.queueId] = ws.mockup.file as string;
+          await kvStore.set(mapKey, thumbMap);
+        }
+      } catch {}
+      setRows(updAll.filter((x: QueueItem) => x.status === 'Antrian revisi'));
+      setOpen(false); setActive(null);
+      setSnack({ open: true, message: 'Worksheet revisi disimpan', severity: 'success' });
+    } catch {
+      setSnack({ open: true, message: 'Gagal menyimpan perubahan', severity: 'error' });
+    }
   };
 
-  const handleSelesai = () => {
+  const handleSelesai = async () => {
     if (saving) return;
     if (!active) return;
     setSaving(true);
     const errs: { mockup?: string } = {};
     if (!ws?.mockup?.file) errs.mockup = 'Mockup revisi wajib diupload.';
     if (Object.keys(errs).length > 0) { setErrors(errs); setSnack({ open: true, message: 'Lengkapi data revisi', severity: 'error' }); setSaving(false); return; }
-    const all = JSON.parse(localStorage.getItem('design_queue') || '[]');
-    const safeWs = sanitizeWorksheet(ws, catatan);
-    const updAll = all.map((it: QueueItem) => (it.idRekapCustom === active.idRekapCustom && String(it.idSpk || '') === String((active as any).idSpk || '')) ? { ...it, status: 'Selesai', worksheet: safeWs } : it);
-    const ok = persist(updAll);
-    if (!ok) { setSnack({ open: true, message: 'Gagal menyelesaikan revisi (storage)', severity: 'error' }); setSaving(false); return; }
-    // keep latest thumbnail
     try {
-      if (active.queueId && ws?.mockup?.file) {
-        const mapKey = 'mockup_thumb_map';
-        const rawMap = localStorage.getItem(mapKey);
-        const thumbMap = rawMap ? JSON.parse(rawMap) : {};
-        thumbMap[active.queueId] = ws.mockup.file;
-        localStorage.setItem(mapKey, JSON.stringify(thumbMap));
-      }
-    } catch {}
-    setRows(updAll.filter((x: QueueItem) => x.status === 'Antrian revisi'));
-    setOpen(false); setActive(null);
-    setSnack({ open: true, message: 'Revisi diselesaikan', severity: 'success' });
-    setSaving(false);
+      const raw = await kvStore.get('design_queue');
+      const all: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+      const safeWs = sanitizeWorksheet(ws, catatan);
+      const updAll = all.map((it: QueueItem) => (it.idRekapCustom === active.idRekapCustom && String(it.idSpk || '') === String((active as any).idSpk || '')) ? { ...it, status: 'Selesai', worksheet: safeWs } : it);
+      const ok = await persist(updAll);
+      if (!ok) { setSnack({ open: true, message: 'Gagal menyelesaikan revisi (server)', severity: 'error' }); setSaving(false); return; }
+      // keep latest thumbnail
+      try {
+        if (active.queueId && ws?.mockup?.file) {
+          const mapKey = 'mockup_thumb_map';
+          const rawMap = await kvStore.get(mapKey);
+          const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap as Record<string, string> : (rawMap ? JSON.parse(String(rawMap)) : {});
+          thumbMap[active.queueId] = ws.mockup.file as string;
+          await kvStore.set(mapKey, thumbMap);
+        }
+      } catch {}
+      setRows(updAll.filter((x: QueueItem) => x.status === 'Antrian revisi'));
+      setOpen(false); setActive(null);
+      setSnack({ open: true, message: 'Revisi diselesaikan', severity: 'success' });
+    } catch {
+      setSnack({ open: true, message: 'Gagal menyelesaikan revisi', severity: 'error' });
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -296,10 +307,10 @@ export default function PraProduksiRevisi() {
                                 try {
                                   if (active?.queueId && thumb) {
                                     const mapKey = 'mockup_thumb_map';
-                                    const rawMap = localStorage.getItem(mapKey);
-                                    const thumbMap = rawMap ? JSON.parse(rawMap) : {};
+                                    const rawMap = await kvStore.get(mapKey);
+                                    const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap as Record<string, string> : (rawMap ? JSON.parse(String(rawMap)) : {});
                                     thumbMap[active.queueId] = thumb;
-                                    localStorage.setItem(mapKey, JSON.stringify(thumbMap));
+                                    await kvStore.set(mapKey, thumbMap);
                                   }
                                 } catch {}
                               } else {

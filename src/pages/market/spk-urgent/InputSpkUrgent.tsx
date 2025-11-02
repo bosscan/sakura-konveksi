@@ -1,5 +1,6 @@
 import { Box, Button, Paper, Stack, TextField, Typography } from '@mui/material';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 
 type UrgentItem = {
   idSpk: string;
@@ -18,17 +19,32 @@ export default function InputSpkUrgent() {
   const [list, setList] = useState<UrgentItem[]>([]);
   const [msg, setMsg] = useState<string>('');
 
-  const load = useCallback(() => {
+  const load = useCallback(async () => {
     try {
-      setList(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'));
+      let arr: UrgentItem[] = [];
+      try {
+        const raw = await kvStore.get(STORAGE_KEY);
+        arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+      } catch { arr = []; }
+      setList(arr);
     } catch { setList([]); }
   }, []);
 
   useEffect(() => {
-    load();
-    const onStorage = (e: StorageEvent) => { if (e.key === STORAGE_KEY) load(); };
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
+    let mounted = true;
+    (async () => {
+      if (!mounted) return;
+      await load();
+      try {
+        const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+          try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setList(arr); } catch { if (mounted) setList([]); }
+        });
+        return () => { try { sub.unsubscribe(); } catch {} };
+      } catch {
+        // fallback: no kvStore subscribe available
+      }
+    })();
+    return () => { mounted = false; };
   }, [load]);
 
   const parseSmart = (value?: string) => {
@@ -45,7 +61,7 @@ export default function InputSpkUrgent() {
     return `${date} ${time}`;
   };
 
-  const save = () => {
+  const save = async () => {
     const id = idSpk.trim();
     if (!id) { setMsg('ID SPK wajib diisi'); return; }
     if (!deadline) { setMsg('Tanggal deadline urgent wajib diisi'); return; }
@@ -57,8 +73,10 @@ export default function InputSpkUrgent() {
     } else {
       next.unshift({ idSpk: id, deadline, note: note.trim(), createdAt: now, updatedAt: now });
     }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-    setList(next);
+    try {
+      await kvStore.set(STORAGE_KEY, next);
+      setList(next);
+    } catch { setList(next); }
     setMsg('Data SPK Urgent tersimpan.');
     setIdSpk('');
     setDeadline('');

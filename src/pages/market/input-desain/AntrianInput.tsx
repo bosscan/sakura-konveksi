@@ -1,5 +1,6 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, Button } from "@mui/material";
 import { useEffect, useRef, useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 import TableExportToolbar from '../../../components/TableExportToolbar';
 import { useNavigate } from "react-router-dom";
 
@@ -16,36 +17,39 @@ export default function AntrianInput() {
     };
     const [rows, setRows] = useState<QueueItem[]>([]);
 
-    const migrateOldSpkData = () => {
+    const migrateOldSpkData = async () => {
         const key = 'antrian_input_desain';
         try {
-            const raw = localStorage.getItem(key);
+            let raw: any = null;
+            try { raw = await kvStore.get(key); } catch { raw = null; }
             if (!raw) return;
-            const list: any[] = JSON.parse(raw) || [];
+            const list: any[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
             let changed = false;
             // helper to get next 7-digit id (keeps and updates spk_auto_seq)
             const seqKey = 'spk_auto_seq';
-            const nextId = () => {
-                let seq = parseInt(localStorage.getItem(seqKey) || '1000000', 10);
-                if (!Number.isFinite(seq) || seq < 1000000) seq = 1000000;
-                seq += 1;
-                localStorage.setItem(seqKey, String(seq));
-                return String(seq).padStart(7, '0');
+            const nextId = async () => {
+                try {
+                    const sraw = await kvStore.get(seqKey);
+                    let seq = Number.isFinite(Number(sraw)) ? parseInt(String(sraw), 10) : NaN;
+                    if (!Number.isFinite(seq) || seq < 1000000) seq = 1000000;
+                    seq += 1;
+                    await kvStore.set(seqKey, String(seq));
+                    return String(seq).padStart(7, '0');
+                } catch { return String(1000001).padStart(7, '0'); }
             };
-            const cleaned = list.map((row) => {
+            const cleaned = await Promise.all(list.map(async (row) => {
                 const orig = String(row?.idSpk ?? '');
                 const normalized = orig.replace(/\s+/g, '').replace(/SPK-/gi, '');
-                // if not exactly 7 digits, remap to new 7-digit sequence
                 if (!/^\d{7}$/.test(normalized)) {
-                    const fresh = nextId();
+                    const fresh = await nextId();
                     changed = true;
                     return { ...row, idSpk: fresh };
                 }
                 if (normalized !== row?.idSpk) { changed = true; return { ...row, idSpk: normalized }; }
                 return row;
-            });
+            }));
             if (changed) {
-                localStorage.setItem(key, JSON.stringify(cleaned));
+                try { await kvStore.set(key, cleaned); } catch {}
             }
             // Sync auto sequence with current max ID
             const nums = cleaned
@@ -53,27 +57,42 @@ export default function AntrianInput() {
                 .filter((n: number) => Number.isFinite(n));
             if (nums.length) {
                 const maxNum = Math.max(...nums);
-                const cur = parseInt(localStorage.getItem(seqKey) || '1000000', 10);
-                if (!Number.isFinite(cur) || cur < maxNum) {
-                    localStorage.setItem(seqKey, String(maxNum));
-                }
+                try {
+                    const curRaw = await kvStore.get(seqKey);
+                    const cur = Number.isFinite(Number(curRaw)) ? parseInt(String(curRaw), 10) : 1000000;
+                    if (!Number.isFinite(cur) || cur < maxNum) {
+                        try { await kvStore.set(seqKey, String(maxNum)); } catch {}
+                    }
+                } catch {}
             }
         } catch {}
     };
 
-    const refresh = () => {
-        const raw = localStorage.getItem('antrian_input_desain');
-        const list: QueueItem[] = raw ? JSON.parse(raw) : [];
-        setRows(list);
+    const refresh = async () => {
+        try {
+            const raw = await kvStore.get('antrian_input_desain');
+            const list: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+            setRows(list);
+        } catch { setRows([]); }
     };
 
     useEffect(() => {
-        migrateOldSpkData();
-        refresh();
-        const onStorage = (e: StorageEvent) => { if (e.key === 'antrian_input_desain') refresh(); };
-        window.addEventListener('storage', onStorage);
-        const timer = setInterval(refresh, 2000);
-        return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+        let mounted = true;
+        (async () => {
+            await migrateOldSpkData();
+            if (!mounted) return;
+            await refresh();
+            try {
+                const sub = kvStore.subscribe('antrian_input_desain', (v) => {
+                    try {
+                        const list = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []);
+                        setRows(list);
+                    } catch { setRows([]); }
+                });
+                return () => { try { sub.unsubscribe(); } catch {} };
+            } catch {}
+        })();
+        return () => { mounted = false; };
     }, []);
 
     const formatWIB = (value?: string) => {
@@ -150,10 +169,8 @@ export default function AntrianInput() {
                                     <Button
                                         variant="contained"
                                         color="primary"
-                                        onClick={() => {
-                                            try {
-                                                localStorage.setItem('current_spk_context', JSON.stringify(row));
-                                            } catch {}
+                                        onClick={async () => {
+                                            try { await kvStore.set('current_spk_context', row); } catch {}
                                             navigate('/market/input-desain/input-spesifikasi');
                                         }}
                                     >

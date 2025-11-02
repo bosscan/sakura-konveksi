@@ -1,5 +1,6 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, Button } from "@mui/material";
 import { useEffect, useRef, useState } from "react";
+import kvStore from '../../../lib/kvStore';
 import TableExportToolbar from "../../../components/TableExportToolbar";
 import { useNavigate } from "react-router-dom";
 
@@ -22,9 +23,22 @@ export default function AntrianPengerjaanDesain() {
   const [rows, setRows] = useState<QueueItem[]>([]);
 
   useEffect(() => {
-    const raw = localStorage.getItem('design_queue');
-    const list: QueueItem[] = raw ? JSON.parse(raw) : [];
-    setRows(list);
+    let mounted = true;
+    const load = async () => {
+      try {
+        const raw = await kvStore.get('design_queue');
+        const list: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setRows(list);
+      } catch { if (mounted) setRows([]); }
+    };
+    load();
+    try {
+      const sub = kvStore.subscribe('design_queue', (v) => {
+        try { const list: QueueItem[] = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setRows(list); } catch { }
+      });
+      return () => { try { sub.unsubscribe(); } catch {} };
+    } catch {}
+    return () => { mounted = false; };
   }, []);
 
   const handleKerjakan = (id: string) => {

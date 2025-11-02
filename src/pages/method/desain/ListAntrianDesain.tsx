@@ -1,5 +1,6 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography } from '@mui/material';
 import { useEffect, useRef, useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 import TableExportToolbar from '../../../components/TableExportToolbar';
 
 type RowData = {
@@ -17,18 +18,40 @@ export default function ListAntrianDesain() {
 	const [rows, setRows] = useState<RowData[]>([]);
 
 	useEffect(() => {
-		const raw = localStorage.getItem('design_queue');
-		const list: any[] = raw ? JSON.parse(raw) : [];
-		const mapped: RowData[] = list.map((it: any) => ({
-			idRekap: it.idRekapCustom,
-			idCustom: it.idCustom,
-			namaDesain: it.namaDesain,
-			produk: it.jenisProduk,
-			tanggalInput: it.tanggalInput,
-			namaCS: it.namaCS,
-			status: it.status || '-',
-		}));
-		setRows(mapped);
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get('design_queue');
+				const list: any[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+				const mapped: RowData[] = list.map((it: any) => ({
+					idRekap: it.idRekapCustom,
+					idCustom: it.idCustom,
+					namaDesain: it.namaDesain,
+					produk: it.jenisProduk,
+					tanggalInput: it.tanggalInput,
+					namaCS: it.namaCS,
+					status: it.status || '-',
+				}));
+				if (mounted) setRows(mapped);
+			} catch {}
+		})();
+
+		// subscribe to kvStore updates when possible
+		let mountedSub = true;
+		(async () => {
+			try {
+				const sub = kvStore.subscribe('design_queue', (v: any) => {
+					try {
+						const list = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []);
+						const mapped = list.map((it: any) => ({ idRekap: it.idRekapCustom, idCustom: it.idCustom, namaDesain: it.namaDesain, produk: it.jenisProduk, tanggalInput: it.tanggalInput, namaCS: it.namaCS, status: it.status || '-' }));
+						if (mountedSub) setRows(mapped);
+					} catch {}
+				});
+				return () => { try { sub.unsubscribe(); } catch {} };
+			} catch {}
+		})();
+
+		return () => { mounted = false; mountedSub = false; };
 	}, []);
 
 	return (

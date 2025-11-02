@@ -1,6 +1,7 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, Button, Modal, TextField, Snackbar, Alert, Chip } from "@mui/material";
 import { useEffect, useRef, useState } from 'react';
 import TableExportToolbar from '../../components/TableExportToolbar';
+import kvStore from '../../lib/kvStore';
 
 function RevisiDesainModal({ open, onClose, onSubmit }: { open: boolean, onClose: () => void, onSubmit: (payload: { catatan: string }) => void }) {
     type Asset = {
@@ -225,73 +226,77 @@ export default function AntrianPengerjaan() {
     const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' });
 
     // Load from shared queue as report source
-    const refresh = () => {
-        const raw = localStorage.getItem('design_queue');
-        const list: any[] = raw ? JSON.parse(raw) : [];
-        // One-time migration: inject queueId if missing to uniquely identify entries even when idRekapCustom duplicates
-        let mutated = false;
-        for (const it of list) {
-            if (!it.queueId) { it.queueId = crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; mutated = true; }
-        }
-        if (mutated) { try { localStorage.setItem('design_queue', JSON.stringify(list)); } catch { } }
-        // read thumbnail map keyed by queueId, created by PraProduksiAntrian
-        let thumbMap: Record<string, string> = {};
+    const refresh = async () => {
         try {
-            const rawThumb = localStorage.getItem('mockup_thumb_map');
-            thumbMap = rawThumb ? JSON.parse(rawThumb) : {};
-        } catch { }
-        let dsMap: Record<string, any> = {};
-        try {
-            const rawDs = localStorage.getItem('spk_design');
-            dsMap = rawDs ? JSON.parse(rawDs) : {};
-        } catch { }
+            const raw = await kvStore.get('design_queue') || [];
+            const list: any[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+            // One-time migration: inject queueId if missing
+            let mutated = false;
+            for (const it of list) {
+                if (!it.queueId) { it.queueId = crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`; mutated = true; }
+            }
+            if (mutated) { try { await kvStore.set('design_queue', list); } catch {} }
 
-        const mapped: RowData[] = list
-            // hide validated regardless of casing/whitespace
-            .filter(it => ((it.status || '').trim().toLowerCase()) !== 'desain di validasi')
-            .map((it) => ({
-                queueId: it.queueId,
-                idRekap: it.idRekapCustom,
-                // idSpk must be consistent end-to-end: never fabricate fallback values here
-                idSpk: it.idSpk || '-',
-                idCustom: it.idCustom,
-                namaDesain: it.namaDesain,
-                produk: it.jenisProduk,
-                tanggalInput: it.tanggalInput,
-                namaCS: it.namaCS,
-                status: it.status || 'Update Status',
-                mockupUrl: it?.worksheet?.mockup?.file || it.assets?.[0]?.file || thumbMap?.[it.queueId] || (dsMap?.[it.idSpk || '']?.mockupUrl || 'https://via.placeholder.com/300x300?text=Mockup'),
-            }));
-        setRows(mapped);
+            // read thumbnail map keyed by queueId
+            let thumbMap: Record<string, string> = {};
+            try {
+                const rawThumb = await kvStore.get('mockup_thumb_map') || {};
+                thumbMap = rawThumb && typeof rawThumb === 'object' ? rawThumb : (typeof rawThumb === 'string' ? JSON.parse(rawThumb) : {});
+            } catch { }
+            let dsMap: Record<string, any> = {};
+            try {
+                const rawDs = await kvStore.get('spk_design') || {};
+                dsMap = rawDs && typeof rawDs === 'object' ? rawDs : (typeof rawDs === 'string' ? JSON.parse(rawDs) : {});
+            } catch { }
+
+            const mapped: RowData[] = list
+                .filter(it => ((it.status || '').trim().toLowerCase()) !== 'desain di validasi')
+                .map((it) => ({
+                    queueId: it.queueId,
+                    idRekap: it.idRekapCustom,
+                    idSpk: it.idSpk || '-',
+                    idCustom: it.idCustom,
+                    namaDesain: it.namaDesain,
+                    produk: it.jenisProduk,
+                    tanggalInput: it.tanggalInput,
+                    namaCS: it.namaCS,
+                    status: it.status || 'Update Status',
+                    mockupUrl: it?.worksheet?.mockup?.file || it.assets?.[0]?.file || thumbMap?.[it.queueId] || (dsMap?.[it.idSpk || '']?.mockupUrl || 'https://via.placeholder.com/300x300?text=Mockup'),
+                }));
+            setRows(mapped);
+        } catch (e) {
+            // fallback to empty
+            setRows([]);
+        }
     };
     useEffect(() => {
-        refresh();
-        const onStorage = (e: StorageEvent) => {
-            if (e.key === 'design_queue') refresh();
-        };
-        window.addEventListener('storage', onStorage);
-        const timer = setInterval(refresh, 2000); // light polling fallback
-        return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+        let mounted = true;
+        const run = async () => { if (!mounted) return; await refresh(); };
+        run();
+        const sub = kvStore.subscribe('design_queue', () => { run().catch(() => {}); });
+        const timer = setInterval(() => { run().catch(() => {}); }, 2000);
+        return () => { mounted = false; try { sub.unsubscribe(); } catch {} ; clearInterval(timer); };
     }, []);
 
     // Ubah status menjadi "Antrian revisi"
-    const handleRevisiSubmit = ({ catatan }: { catatan: string }) => {
+    const handleRevisiSubmit = async ({ catatan }: { catatan: string }) => {
         if (selectedRow !== null) {
             const newRows = [...rows];
             newRows[selectedRow].status = "Antrian revisi";
             setRows(newRows);
             // persist back to queue with revisi catatan
-            const raw = localStorage.getItem('design_queue');
-            const list: any[] = raw ? JSON.parse(raw) : [];
-            // Utamakan queueId untuk identifikasi unik; fallback ke kombinasi idRekapCustom + idSpk
-            const target = newRows[selectedRow!];
-            const idx = list.findIndex((x) => (target.queueId && x.queueId === target.queueId)
-                || (x.idRekapCustom === target.idRekap && String(x.idSpk || '') === String(target.idSpk || '')));
-            if (idx >= 0) {
-                list[idx].status = newRows[selectedRow!].status;
-                list[idx].revisiCatatan = catatan;
-                localStorage.setItem('design_queue', JSON.stringify(list));
-            }
+            try {
+                const raw = await kvStore.get('design_queue') || [];
+                const list: any[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+                const target = newRows[selectedRow!];
+                const idx = list.findIndex((x) => (target.queueId && x.queueId === target.queueId)
+                    || (x.idRekapCustom === target.idRekap && String(x.idSpk || '') === String(target.idSpk || '')));
+                if (idx >= 0) {
+                    list[idx].status = newRows[selectedRow!].status;
+                    list[idx].revisiCatatan = catatan;
+                    try { await kvStore.set('design_queue', list); } catch {}
+                }
+            } catch {}
             setSnack({ open: true, message: 'Masuk ke Antrian Revisi Desain', severity: 'success' });
         }
     };
@@ -303,108 +308,102 @@ export default function AntrianPengerjaan() {
     };
 
     // Jika klik "Ya" pada konfirmasi validasi
-    const handleConfirmValidasi = () => {
+    const handleConfirmValidasi = async () => {
         if (validasiRow !== null) {
             const newRows = [...rows];
             newRows[validasiRow].status = "Desain di validasi";
-            // Immediately hide from UI
             setRows(newRows.filter(r => r.status !== 'Desain di validasi'));
-            const raw = localStorage.getItem('design_queue');
-            const list: any[] = raw ? JSON.parse(raw) : [];
-            // Targetkan item spesifik: queueId jika ada, jika tidak gunakan kombinasi idRekapCustom + idSpk
-            const target = newRows[validasiRow!];
-            const idx = list.findIndex((x) => (target.queueId && x.queueId === target.queueId)
-                || (x.idRekapCustom === target.idRekap && String(x.idSpk || '') === String(target.idSpk || '')));
-            if (idx >= 0) {
-                // capture source before any mutation
-                const source = list[idx];
-                // push into keranjang FIRST
-                const kKey = 'keranjang';
-                const kRaw = localStorage.getItem(kKey);
-                const cart = kRaw ? JSON.parse(kRaw) : [];
-                const item = newRows[validasiRow!];
-                const exists = cart.some((c: any) => c.idRekap === item.idRekap);
-                if (!exists) {
-                    // Determine stable idSpk (must exist, 7-digit)
-                    const isGood = (v: any) => typeof v === 'string' && /^\d{7}$/.test(v);
-                    let finalIdSpk = isGood(item.idSpk) ? item.idSpk : '';
-                    if (!finalIdSpk && isGood(source?.idSpk)) finalIdSpk = source.idSpk;
-                    if (!finalIdSpk) {
+            try {
+                const raw = await kvStore.get('design_queue') || [];
+                const list: any[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
+                const target = newRows[validasiRow!];
+                const idx = list.findIndex((x) => (target.queueId && x.queueId === target.queueId)
+                    || (x.idRekapCustom === target.idRekap && String(x.idSpk || '') === String(target.idSpk || '')));
+                if (idx >= 0) {
+                    const source = list[idx];
+                    // push into keranjang FIRST
+                    const kKey = 'keranjang';
+                    const kRaw = await kvStore.get(kKey) || [];
+                    const cart = Array.isArray(kRaw) ? kRaw : (typeof kRaw === 'string' ? JSON.parse(kRaw) : []);
+                    const item = newRows[validasiRow!];
+                    const exists = cart.some((c: any) => c.idRekap === item.idRekap);
+                    if (!exists) {
+                        const isGood = (v: any) => typeof v === 'string' && /^\d{7}$/.test(v);
+                        let finalIdSpk = isGood(item.idSpk) ? item.idSpk : '';
+                        if (!finalIdSpk && isGood(source?.idSpk)) finalIdSpk = source.idSpk;
+                        if (!finalIdSpk) {
+                            try {
+                                const qRaw = await kvStore.get('antrian_input_desain') || [];
+                                const qList = Array.isArray(qRaw) ? qRaw : (typeof qRaw === 'string' ? JSON.parse(qRaw) : []);
+                                const candidates = [item.idSpk, source?.idSpk].filter(Boolean);
+                                const found = qList.find((q: any) => candidates.includes(q?.idSpk));
+                                if (isGood(found?.idSpk)) finalIdSpk = found.idSpk;
+                            } catch { }
+                        }
+                        if (!finalIdSpk) {
+                            setSnack({ open: true, message: 'Gagal memasukkan ke keranjang: ID SPK tidak ditemukan.', severity: 'error' });
+                            return;
+                        }
+                        let qtyStr = String(source?.spkQuantity || '');
+                        if (!qtyStr) {
+                            try {
+                                const qRaw = await kvStore.get('antrian_input_desain') || [];
+                                const qList = Array.isArray(qRaw) ? qRaw : (typeof qRaw === 'string' ? JSON.parse(qRaw) : []);
+                                const found = qList.find((q: any) => q?.idSpk === finalIdSpk);
+                                const n = Number(String(found?.quantity ?? '').replace(/[^\d-]/g, ''));
+                                qtyStr = !isNaN(n) && n > 0 ? String(n) : '0';
+                            } catch { }
+                        }
+                        cart.push({
+                            idRekap: item.idRekap,
+                            idSpk: finalIdSpk,
+                            idCustom: item.idCustom,
+                            namaDesain: item.namaDesain,
+                            namaKonsumen: '-',
+                            kuantity: Number(qtyStr) || 0,
+                            selected: false,
+                        });
+                        try { await kvStore.set(kKey, cart); } catch {}
+                        // Persist mockup snapshot for Print SPK
                         try {
-                            const qRaw = localStorage.getItem('antrian_input_desain');
-                            const qList = qRaw ? JSON.parse(qRaw) : [];
-                            const candidates = [item.idSpk, source?.idSpk].filter(Boolean);
-                            const found = qList.find((q: any) => candidates.includes(q?.idSpk));
-                            if (isGood(found?.idSpk)) finalIdSpk = found.idSpk;
+                            const dsKey = 'spk_design';
+                            const dsRaw = await kvStore.get(dsKey) || {};
+                            const dsMap = dsRaw && typeof dsRaw === 'object' ? dsRaw : (typeof dsRaw === 'string' ? JSON.parse(dsRaw) : {});
+                            const prev = dsMap[finalIdSpk] || {};
+                            let thumb: string | undefined = undefined;
+                            try {
+                                const rawMap = await kvStore.get('mockup_thumb_map') || {};
+                                const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap : (typeof rawMap === 'string' ? JSON.parse(rawMap) : {});
+                                const qid = source?.queueId || item.queueId;
+                                if (qid && thumbMap[qid]) thumb = thumbMap[qid];
+                            } catch { }
+                            const mockupUrl = source?.worksheet?.mockup?.file || thumb || prev.mockupUrl;
+                            const worksheet = source?.worksheet || prev.worksheet;
+                            const linkDriveAssetJadi = source?.worksheet?.linkDriveAssetJadi || prev.linkDriveAssetJadi;
+                            dsMap[finalIdSpk] = { ...prev, mockupUrl, worksheet, linkDriveAssetJadi };
+                            try { await kvStore.set(dsKey, dsMap); } catch {}
                         } catch { }
                     }
-                    if (!finalIdSpk) {
-                        setSnack({ open: true, message: 'Gagal memasukkan ke keranjang: ID SPK tidak ditemukan.', severity: 'error' });
-                        return; // do not remove from queue if we failed to push cart
-                    }
-                    // Quantity from source, else lookup queue
-                    let qtyStr = String(source?.spkQuantity || '');
-                    if (!qtyStr) {
-                        try {
-                            const qRaw = localStorage.getItem('antrian_input_desain');
-                            const qList = qRaw ? JSON.parse(qRaw) : [];
-                            const found = qList.find((q: any) => q?.idSpk === finalIdSpk);
-                            const n = Number(String(found?.quantity ?? '').replace(/[^\d-]/g, ''));
-                            qtyStr = !isNaN(n) && n > 0 ? String(n) : '0';
-                        } catch { }
-                    }
-                    cart.push({
-                        idRekap: item.idRekap,
-                        idSpk: finalIdSpk,
-                        idCustom: item.idCustom,
-                        namaDesain: item.namaDesain,
-                        namaKonsumen: '-',
-                        kuantity: Number(qtyStr) || 0,
-                        selected: false,
-                    });
-                    localStorage.setItem(kKey, JSON.stringify(cart));
-                    // Persist mockup snapshot for Print SPK (spk_design)
+                    // now mark validated and remove from queue
+                    list[idx].status = newRows[validasiRow!].status;
+                    const removed = list.splice(idx, 1)[0];
+                    try { await kvStore.set('design_queue', list); } catch {}
+                    // Cleanup thumbnail map
                     try {
-                        const dsKey = 'spk_design';
-                        const dsRaw = localStorage.getItem(dsKey);
-                        const dsMap = dsRaw ? JSON.parse(dsRaw) : {};
-                        const prev = dsMap[finalIdSpk] || {};
-                        // Get thumbnail before we clean it up below
-                        let thumb: string | undefined = undefined;
-                        try {
-                            const mapKey = 'mockup_thumb_map';
-                            const rawMap = localStorage.getItem(mapKey);
-                            const thumbMap = rawMap ? JSON.parse(rawMap) : {};
-                            const qid = source?.queueId || item.queueId;
-                            if (qid && thumbMap[qid]) thumb = thumbMap[qid];
-                        } catch { }
-                        const mockupUrl = source?.worksheet?.mockup?.file || thumb || prev.mockupUrl;
-                        const worksheet = source?.worksheet || prev.worksheet;
-                        const linkDriveAssetJadi = source?.worksheet?.linkDriveAssetJadi || prev.linkDriveAssetJadi;
-                        dsMap[finalIdSpk] = { ...prev, mockupUrl, worksheet, linkDriveAssetJadi };
-                        localStorage.setItem(dsKey, JSON.stringify(dsMap));
+                        const rawMap = await kvStore.get('mockup_thumb_map') || {};
+                        const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap : (typeof rawMap === 'string' ? JSON.parse(rawMap) : {});
+                        const qid = removed?.queueId || target.queueId;
+                        if (qid && thumbMap[qid]) {
+                            delete thumbMap[qid];
+                            try { await kvStore.set('mockup_thumb_map', thumbMap); } catch {}
+                        }
                     } catch { }
                 }
-                // now mark validated and remove from queue (source of truth)
-                list[idx].status = newRows[validasiRow!].status;
-                const removed = list.splice(idx, 1)[0];
-                localStorage.setItem('design_queue', JSON.stringify(list));
-                // Cleanup thumbnail map for this queueId
-                try {
-                    const mapKey = 'mockup_thumb_map';
-                    const rawMap = localStorage.getItem(mapKey);
-                    const thumbMap = rawMap ? JSON.parse(rawMap) : {};
-                    const qid = removed?.queueId || target.queueId;
-                    if (qid && thumbMap[qid]) {
-                        delete thumbMap[qid];
-                        localStorage.setItem(mapKey, JSON.stringify(thumbMap));
-                    }
-                } catch { }
-            }
+            } catch {}
         }
         setOpenValidasiModal(false);
         setValidasiRow(null);
-        refresh();
+        await refresh();
         setSnack({ open: true, message: 'Desain divalidasi dan dimasukkan ke keranjang', severity: 'success' });
     };
 

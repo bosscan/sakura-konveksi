@@ -1,6 +1,7 @@
 import { Box, Button, Stack, TextField, Typography, FormControlLabel, Checkbox } from '@mui/material';
 import QRCode from 'qrcode';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import kvStore from '../../lib/kvStore';
 import { useSearchParams } from 'react-router-dom';
 import html2canvas from 'html2canvas';
 import jsPDF from 'jspdf';
@@ -11,20 +12,23 @@ type Calibration = { offsetX: number; offsetY: number; scale: number; fontScale:
 const CAL_KEY = 'spk_print_calibration';
 
 function loadCalibration(): Calibration {
+  // Start with sensible defaults; kvStore.hydration will overwrite when available.
+  return { offsetX: 0, offsetY: 0, scale: 1, fontScale: 1, showGrid: false };
+}
+
+// Hydrate calibration from KV when available (async). We keep sync localStorage read
+// as initial value for backwards compatibility, then overwrite with KV value.
+async function hydrateCalibration(setCal: (c: Calibration) => void) {
   try {
-    const raw = localStorage.getItem(CAL_KEY);
-    if (!raw) return { offsetX: 0, offsetY: 0, scale: 1, fontScale: 1, showGrid: false };
-    const parsed = JSON.parse(raw);
-    return {
-      offsetX: Number(parsed.offsetX) || 0,
-      offsetY: Number(parsed.offsetY) || 0,
-      scale: Number(parsed.scale) || 1,
-      fontScale: Number(parsed.fontScale) || 1,
-      showGrid: !!parsed.showGrid,
-    };
-  } catch {
-    return { offsetX: 0, offsetY: 0, scale: 1, fontScale: 1, showGrid: false };
-  }
+    const v = await kvStore.get(CAL_KEY);
+    if (v && typeof v === 'object') setCal({
+      offsetX: Number(v.offsetX) || 0,
+      offsetY: Number(v.offsetY) || 0,
+      scale: Number(v.scale) || 1,
+      fontScale: Number(v.fontScale) || 1,
+      showGrid: !!v.showGrid,
+    });
+  } catch {}
 }
 
 function useQueryIdSpk() {
@@ -38,27 +42,28 @@ function useQueryIdSpk() {
   return [id, setId] as const;
 }
 
-function loadLs<T = any>(key: string): T[] {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) : []; } catch { return []; }
+async function loadLs<T = any>(key: string): Promise<T[]> {
+  try { const raw = await kvStore.get(key); return Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { return []; }
 }
 
-function mergeSpkData(idSpk: string) {
-  const pipeline = loadLs('spk_pipeline');
-  const designQueue = loadLs('design_queue');
-  const keranjang = loadLs('keranjang');
-  const plottingQueue = loadLs('plotting_rekap_bordir_queue');
-  const antrianPengerjaan = loadLs('antrian_pengerjaan_desain');
-  const antrian: AnyRec[] = loadLs('antrian_input_desain');
+async function mergeSpkDataAsync(idSpk: string) {
+  // Read from kvStore (preferred) with defensive parsing
+  const pipeline = Array.isArray(await kvStore.get('spk_pipeline')) ? await kvStore.get('spk_pipeline') : (await loadLs('spk_pipeline')) || [];
+  const designQueue = Array.isArray(await kvStore.get('design_queue')) ? await kvStore.get('design_queue') : (await loadLs('design_queue')) || [];
+  const keranjang = Array.isArray(await kvStore.get('keranjang')) ? await kvStore.get('keranjang') : (await loadLs('keranjang')) || [];
+  const plottingQueue = Array.isArray(await kvStore.get('plotting_rekap_bordir_queue')) ? await kvStore.get('plotting_rekap_bordir_queue') : (await loadLs('plotting_rekap_bordir_queue')) || [];
+  const antrianPengerjaan = Array.isArray(await kvStore.get('antrian_pengerjaan_desain')) ? await kvStore.get('antrian_pengerjaan_desain') : (await loadLs('antrian_pengerjaan_desain')) || [];
+  const antrian: AnyRec[] = Array.isArray(await kvStore.get('antrian_input_desain')) ? await kvStore.get('antrian_input_desain') : (await loadLs('antrian_input_desain')) || [];
   let form: AnyRec | null = null;
-  try { form = JSON.parse(localStorage.getItem('inputDetailForm') || 'null'); } catch { form = null; }
+  try { const v = await kvStore.get('inputDetailForm'); form = v ? (typeof v === 'string' ? JSON.parse(v) : v) : null; } catch { form = null; }
   let formProduk: AnyRec | null = null;
-  try { formProduk = JSON.parse(localStorage.getItem('inputProdukForm') || 'null'); } catch { formProduk = null; }
+  try { const v = await kvStore.get('inputProdukForm'); formProduk = v ? (typeof v === 'string' ? JSON.parse(v) : v) : null; } catch { formProduk = null; }
   let formTambahan: AnyRec | null = null;
-  try { formTambahan = JSON.parse(localStorage.getItem('inputTambahanForm') || 'null'); } catch { formTambahan = null; }
+  try { const v = await kvStore.get('inputTambahanForm'); formTambahan = v ? (typeof v === 'string' ? JSON.parse(v) : v) : null; } catch { formTambahan = null; }
   // Snapshots keyed by idSpk
   let spkOrders: Record<string, AnyRec> = {}; let spkDesign: Record<string, AnyRec> = {};
-  try { spkOrders = JSON.parse(localStorage.getItem('spk_orders') || '{}') || {}; } catch { }
-  try { spkDesign = JSON.parse(localStorage.getItem('spk_design') || '{}') || {}; } catch { }
+  try { const v = await kvStore.get('spk_orders'); spkOrders = v && typeof v === 'object' ? v : (v ? JSON.parse(String(v)) : {}); } catch { }
+  try { const v = await kvStore.get('spk_design'); spkDesign = v && typeof v === 'object' ? v : (v ? JSON.parse(String(v)) : {}); } catch { }
 
   const spkItem: AnyRec | undefined = pipeline.find((x: AnyRec) => String(x?.idSpk ?? '').trim() === String(idSpk).trim());
   const antrianItem: AnyRec | undefined = antrian.find((x: AnyRec) => String(x?.idSpk ?? '').trim() === String(idSpk).trim()) || spkOrders[idSpk];
@@ -78,17 +83,17 @@ function mergeSpkData(idSpk: string) {
       } else {
         // Fallback ke thumbnail map berbasis queueId (mockup disimpan kecil untuk hemat storage)
         try {
-          const raw = localStorage.getItem('mockup_thumb_map');
-          const map = raw ? JSON.parse(raw) : {};
+          const raw = await kvStore.get('mockup_thumb_map');
+          const map = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
           // 1) langsung dari design_queue jika ada queueId
           let qid = (design as AnyRec)?.queueId;
           // 2) jika tidak ada (data lama sudah keluar dari queue), gunakan peta idSpk -> queueId
           if (!qid) {
-            try {
-              const r2 = localStorage.getItem('design_queueid_by_spk');
-              const m2 = r2 ? JSON.parse(r2) : {};
-              qid = m2?.[idSpk];
-            } catch { }
+                            try {
+                              const r2 = await kvStore.get('design_queueid_by_spk');
+                              const m2 = r2 && typeof r2 === 'object' ? r2 : (r2 ? JSON.parse(String(r2)) : {});
+                              qid = m2?.[idSpk];
+                            } catch { }
           }
           // 3) terakhir, cek item yang berada di antrian_pengerjaan_desain
           if (!qid) {
@@ -136,7 +141,8 @@ function mergeSpkData(idSpk: string) {
   const prMapKey = 'production_recap_map';
   let mappedRecap: string | undefined;
   try {
-    const map = JSON.parse(localStorage.getItem(prMapKey) || '{}') || {};
+    const raw = await kvStore.get(prMapKey);
+    const map = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
     const v = robustMapGet(map, idSpk);
     if (v) mappedRecap = String(v).padStart(7, '0');
   } catch { }
@@ -146,7 +152,8 @@ function mergeSpkData(idSpk: string) {
   const txMapKey = 'transaction_id_map';
   let mappedTx: string | undefined;
   try {
-    const map = JSON.parse(localStorage.getItem(txMapKey) || '{}') || {};
+    const raw = await kvStore.get(txMapKey);
+    const map = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
     const v = robustMapGet(map, idSpk);
     if (v) mappedTx = String(v).padStart(7, '0');
   } catch { }
@@ -304,14 +311,30 @@ function mergeSpkData(idSpk: string) {
   } as AnyRec;
 }
 
+
 export default function PrintSPK() {
   const [idSpk, setIdSpk] = useQueryIdSpk();
   const [inputId, setInputId] = useState(idSpk);
   const [reloadSeed, setReloadSeed] = useState(0);
-  const data = useMemo(() => (idSpk ? mergeSpkData(idSpk) : null), [idSpk, reloadSeed]);
+  const [data, setData] = useState<AnyRec | null>(null);
+  // hydrate async data from kvStore
+  useEffect(() => {
+    let mounted = true;
+    const load = async () => {
+      if (!idSpk) { if (mounted) setData(null); return; }
+      try {
+        const d = await mergeSpkDataAsync(idSpk);
+        if (mounted) setData(d);
+      } catch (e) { if (mounted) setData(null); }
+    };
+    load();
+    return () => { mounted = false; };
+  }, [idSpk, reloadSeed]);
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [params] = useSearchParams();
   const [cal, setCal] = useState<Calibration>(() => loadCalibration());
+  // Hydrate calibration from KV (async) to overwrite initial localStorage values when available
+  useEffect(() => { hydrateCalibration(setCal).catch(()=>{}); }, []);
   const [qrUrl, setQrUrl] = useState<string>('');
   const [logoMissing, setLogoMissing] = useState(false);
   const [processedImages, setProcessedImages] = useState<Record<string, string>>({});
@@ -397,9 +420,6 @@ export default function PrintSPK() {
 
       // Process attribute images
       const ws = snap.worksheet || {};
-      // Catatan penting: Atribut di SPK HANYA boleh berasal dari lembar kerja desainer (pra produksi).
-      // Jangan lagi mengambil gambar atribut dari "input desain" awal (assets).
-      // Oleh karena itu, kita sengaja tidak menggunakan snap.assets sebagai fallback di sini.
 
       const attributeBlocks = [
         { key: 'lenganKanan', label: 'ATRIBUT LENGAN KANAN', b: ws.lenganKanan },
@@ -427,39 +447,39 @@ export default function PrintSPK() {
     processImages();
   }, [data?.designSnap]);
 
-  const persistDesignSnapshot = (id: string, patch: Record<string, any>) => {
+  const persistDesignSnapshot = async (id: string, patch: Record<string, any>) => {
     try {
       const key = 'spk_design';
-      const raw = localStorage.getItem(key);
-      const map = raw ? JSON.parse(raw) : {};
+      const raw = await kvStore.get(key);
+      const map = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
       const prev = map[id] || {};
       map[id] = { ...prev, ...patch };
-      localStorage.setItem(key, JSON.stringify(map));
+      await kvStore.set(key, map);
       setReloadSeed((s) => s + 1);
       return true;
     } catch { return false; }
   };
 
-  const pullThumbnailToSnapshot = () => {
+  const pullThumbnailToSnapshot = async () => {
     const id = idSpk || inputId;
     if (!id) return false;
     try {
       // Attempt to find queueId from mapping or queues
-      const rMap = localStorage.getItem('design_queueid_by_spk');
-      const mapBySpk = rMap ? JSON.parse(rMap) : {};
+      const rMapRaw = await kvStore.get('design_queueid_by_spk');
+      const mapBySpk = rMapRaw && typeof rMapRaw === 'object' ? rMapRaw : (rMapRaw ? JSON.parse(String(rMapRaw)) : {});
       let qid = mapBySpk?.[id];
       const pick = (arr: any[]) => arr.find((x) => String(x?.idSpk || '').trim() === String(id).trim());
-      const dq = loadLs('design_queue') as any[];
-      const antri = loadLs('antrian_pengerjaan_desain') as any[];
+      const dq = (await loadLs('design_queue')) as any[];
+      const antri = (await loadLs('antrian_pengerjaan_desain')) as any[];
       if (!qid) qid = (pick(dq) as any)?.queueId;
       if (!qid) qid = (pick(antri) as any)?.queueId;
-      const rawT = localStorage.getItem('mockup_thumb_map');
-      const tmap = rawT ? JSON.parse(rawT) : {};
+      const rawT = await kvStore.get('mockup_thumb_map');
+      const tmap = rawT && typeof rawT === 'object' ? rawT : (rawT ? JSON.parse(String(rawT)) : {});
       const thumb = qid ? tmap[qid] : undefined;
       const direct = (pick(dq) as any)?.worksheet?.mockup?.file || (pick(antri) as any)?.worksheet?.mockup?.file;
       const use = direct || thumb;
       if (use) {
-        persistDesignSnapshot(id, { mockupUrl: use });
+        await persistDesignSnapshot(id, { mockupUrl: use });
         return true;
       }
     } catch { }
@@ -551,7 +571,7 @@ export default function PrintSPK() {
       if (id) {
         // Process the image before storing
         const processedImage = await downscaleImage(dataUrl, 800, 600, 0.9);
-        persistDesignSnapshot(id, { mockupUrl: processedImage });
+        await persistDesignSnapshot(id, { mockupUrl: processedImage });
       }
     };
     reader.readAsDataURL(file);
@@ -583,19 +603,19 @@ export default function PrintSPK() {
 
       {/* Calibration + Edit controls */}
       <Stack direction="row" spacing={1} alignItems="center" sx={{ mb: 1, '@media print': { display: 'none' } }}>
-        <TextField label="Offset X" size="small" type="number" value={cal.offsetX}
-          onChange={(e) => { const v = Number(e.target.value || 0); const n = { ...cal, offsetX: v }; setCal(n); localStorage.setItem(CAL_KEY, JSON.stringify(n)); }}
-          sx={{ width: 110 }} />
-        <TextField label="Offset Y" size="small" type="number" value={cal.offsetY}
-          onChange={(e) => { const v = Number(e.target.value || 0); const n = { ...cal, offsetY: v }; setCal(n); localStorage.setItem(CAL_KEY, JSON.stringify(n)); }}
-          sx={{ width: 110 }} />
-        <TextField label="Scale" size="small" type="number" inputProps={{ step: '0.01' }} value={cal.scale}
-          onChange={(e) => { const v = Number(e.target.value || 1); const n = { ...cal, scale: v }; setCal(n); localStorage.setItem(CAL_KEY, JSON.stringify(n)); }}
-          sx={{ width: 110 }} />
-        <TextField label="Font Scale" size="small" type="number" inputProps={{ step: '0.05' }} value={cal.fontScale}
-          onChange={(e) => { const v = Number(e.target.value || 1); const n = { ...cal, fontScale: v }; setCal(n); localStorage.setItem(CAL_KEY, JSON.stringify(n)); }}
-          sx={{ width: 130 }} />
-        <FormControlLabel control={<Checkbox checked={!!cal.showGrid} onChange={(e) => { const n = { ...cal, showGrid: e.target.checked }; setCal(n); localStorage.setItem(CAL_KEY, JSON.stringify(n)); }} />} label="Grid" />
+    <TextField label="Offset X" size="small" type="number" value={cal.offsetX}
+    onChange={(e) => { const v = Number(e.target.value || 0); const n = { ...cal, offsetX: v }; setCal(n); kvStore.set(CAL_KEY, n).catch(()=>{}); }}
+      sx={{ width: 110 }} />
+    <TextField label="Offset Y" size="small" type="number" value={cal.offsetY}
+    onChange={(e) => { const v = Number(e.target.value || 0); const n = { ...cal, offsetY: v }; setCal(n); kvStore.set(CAL_KEY, n).catch(()=>{}); }}
+      sx={{ width: 110 }} />
+    <TextField label="Scale" size="small" type="number" inputProps={{ step: '0.01' }} value={cal.scale}
+    onChange={(e) => { const v = Number(e.target.value || 1); const n = { ...cal, scale: v }; setCal(n); kvStore.set(CAL_KEY, n).catch(()=>{}); }}
+      sx={{ width: 110 }} />
+    <TextField label="Font Scale" size="small" type="number" inputProps={{ step: '0.05' }} value={cal.fontScale}
+    onChange={(e) => { const v = Number(e.target.value || 1); const n = { ...cal, fontScale: v }; setCal(n); kvStore.set(CAL_KEY, n).catch(()=>{}); }}
+      sx={{ width: 130 }} />
+  <FormControlLabel control={<Checkbox checked={!!cal.showGrid} onChange={(e) => { const n = { ...cal, showGrid: e.target.checked }; setCal(n); kvStore.set(CAL_KEY, n).catch(()=>{}); }} />} label="Grid" />
       </Stack>
 
       {!data ? (

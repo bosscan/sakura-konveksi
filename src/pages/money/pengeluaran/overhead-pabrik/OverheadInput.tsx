@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from 'react';
 import { Box, Typography, Grid, TextField, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter } from '@mui/material';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type Overhead = { id: string; date: string; category: string; description: string; amount: number; note?: string };
 const STORAGE_KEY = 'pengeluaran_overhead_pabrik';
@@ -12,8 +13,13 @@ const OverheadInput: React.FC = () => {
   const [items, setItems] = useState<Overhead[]>([]);
   const tableRef = useRef<HTMLTableElement | null>(null);
 
-  useEffect(() => { try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) setItems(JSON.parse(raw)); } catch {} }, []);
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }, [items]);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? (raw as Overhead[]) : (raw ? JSON.parse(String(raw)) : []); if (mounted) setItems(list); } catch { if (mounted) setItems([]); } };
+    (async () => { await refresh(); try { const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} }); return () => { try { sub.unsubscribe(); } catch {} }; } catch {} })();
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => { (async () => { try { await kvStore.set(STORAGE_KEY, items); } catch {} })(); }, [items]);
 
   const filtered = useMemo(() => items.filter(i => i.date?.startsWith(`${month}-`)), [items, month]);
   const totalFiltered = useMemo(() => filtered.reduce((a, b) => a + (b.amount || 0), 0), [filtered]);

@@ -3,6 +3,7 @@ import type { SelectChangeEvent } from "@mui/material/Select";
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useEffect, useMemo, useRef, useState } from "react";
+import kvStore from "../../lib/kvStore";
 
 function formatIDR(n: number): string {
   try { return n.toLocaleString("id-ID", { style: "currency", currency: "IDR", maximumFractionDigits: 0 }); } catch { return `Rp ${Math.round(n)}`; }
@@ -170,38 +171,40 @@ export default function CetakInvoice() {
     });
     if (!hasValidItem) return setReady(false);
     // Generate sequential invoice number (5 digits) starting from 00001
-    try {
-      const key = "invoice_counter";
-      const raw = localStorage.getItem(key);
-      const current = Math.max(0, Number(raw || 0));
-      const next = current + 1;
-      localStorage.setItem(key, String(next));
-      const formatted = String(next).padStart(5, '0');
-      setInvoiceNo(formatted);
-      // Persist essential invoice DP/DPL data for Pelunasan lookup
+    (async () => {
       try {
-        const storeKey = 'invoice_records';
-        const rawMap = localStorage.getItem(storeKey);
-        const map = rawMap ? JSON.parse(rawMap) : {};
-        const rec = {
-          no: formatted,
-          jenis: jenisTransaksi,
-          rows, // snapshot of item rows including Ongkir row if any
-          total,
-          nominalTransaksi: nominalTransaksiNum,
-          kekurangan,
-          ongkir: cleanNumber(nominalOngkir),
-          namaKonsumen,
-          namaInstansi,
-          date: new Date().toISOString(),
-        };
-        map[formatted] = rec;
-        localStorage.setItem(storeKey, JSON.stringify(map));
+        const key = "invoice_counter";
+        const raw = await kvStore.get(key);
+        const current = Math.max(0, Number(raw || 0));
+        const next = current + 1;
+        try { await kvStore.set(key, String(next)); } catch {}
+        const formatted = String(next).padStart(5, '0');
+        setInvoiceNo(formatted);
+        // Persist essential invoice DP/DPL data for Pelunasan lookup
+        try {
+          const storeKey = 'invoice_records';
+          const rawMap = await kvStore.get(storeKey);
+          const map = rawMap && typeof rawMap === 'object' ? rawMap : (rawMap ? JSON.parse(String(rawMap)) : {});
+          const rec = {
+            no: formatted,
+            jenis: jenisTransaksi,
+            rows, // snapshot of item rows including Ongkir row if any
+            total,
+            nominalTransaksi: nominalTransaksiNum,
+            kekurangan,
+            ongkir: cleanNumber(nominalOngkir),
+            namaKonsumen,
+            namaInstansi,
+            date: new Date().toISOString(),
+          } as any;
+          map[formatted] = rec;
+          await kvStore.set(storeKey, map);
+        } catch {}
       } catch {}
-    } catch {}
-    setReady(true);
-    // tiny debounce to ensure preview updates before print if clicked fast
-    setTimeout(() => {}, 50);
+      setReady(true);
+      // tiny debounce to ensure preview updates before print if clicked fast
+      setTimeout(() => {}, 50);
+    })();
   };
 
   const rows = useMemo(() => {

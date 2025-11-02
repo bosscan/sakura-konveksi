@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from "react";
 import { Box, Typography, Grid, TextField, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter, MenuItem, Select } from '@mui/material';
 import { BarChart } from '@mui/x-charts/BarChart';
 import TableExportToolbar from '../../../components/TableExportToolbar';
+import kvStore from '../../../lib/kvStore';
 
 type Row = {
   id: number;
@@ -26,18 +27,33 @@ const OmsetJam: React.FC = () => {
   const [date, setDate] = useState<string>('');
   const [hour, setHour] = useState<string>('');
   const tableRef = useRef<HTMLTableElement | null>(null);
-  const [version, setVersion] = useState(0);
+  const [records, setRecords] = useState<Array<{ tanggal: string; tipeTransaksi: string; nominal: number }>>([]);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (e.key === 'omset_pendapatan') setVersion(v => v + 1); };
-    window.addEventListener('storage', onStorage);
-    const t = setInterval(() => setVersion(v => v + 1), 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get('omset_pendapatan');
+        const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setRecords(list);
+      } catch { if (mounted) setRecords([]); }
+    };
+    (async () => {
+      await refresh();
+      try {
+        const sub = kvStore.subscribe('omset_pendapatan', () => { try { refresh(); } catch {} });
+        const t = setInterval(refresh, 3000);
+        return () => { try { sub.unsubscribe(); } catch {}; clearInterval(t); };
+      } catch {
+        const t = setInterval(refresh, 2000);
+        return () => clearInterval(t);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const allRows: Row[] = useMemo(() => {
-    const raw = localStorage.getItem('omset_pendapatan');
-    const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = raw ? JSON.parse(raw) : [];
+    const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = records || [];
     const map = new Map<string, Row>();
     list.forEach((r) => {
       const ymd = (r.tanggal || '').slice(0, 10);
@@ -55,7 +71,7 @@ const OmsetJam: React.FC = () => {
       map.set(key, cur);
     });
     return Array.from(map.values()).sort((a,b) => (a.date + a.hour).localeCompare(b.date + b.hour)).map((v, i) => ({ ...v, id: i + 1 }));
-  }, [version]);
+  }, [records]);
 
   const filtered = useMemo(() => {
     return allRows.filter((r) => {

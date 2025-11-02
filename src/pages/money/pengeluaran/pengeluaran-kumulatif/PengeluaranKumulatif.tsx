@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Box, Typography, Grid, TextField, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Chip, Stack, TableFooter } from '@mui/material';
 import { ResponsiveContainer, PieChart, Pie, Cell, Tooltip as RTooltip, Legend as RLegend } from 'recharts';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type Gaji = { date: string; base: number; overtime: number; bonus: number; deduction: number };
 type Belanja = { date: string; qty: number; price: number };
@@ -18,14 +19,41 @@ const PengeluaranKumulatif: React.FC = () => {
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [month, setMonth] = useState(defaultMonth);
 
-  // Load all expense datasets from localStorage
-  const gaji: Gaji[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_gaji') || '[]'); } catch { return []; } }, []);
-  const belanja: Belanja[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_belanja_logistik') || '[]'); } catch { return []; } }, []);
-  const fee: Fee[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_fee_jaringan') || '[]'); } catch { return []; } }, []);
-  const ads: Ads[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_marketing_ads') || '[]'); } catch { return []; } }, []);
-  const ongkir: Ongkir[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_ongkir') || '[]'); } catch { return []; } }, []);
-  const maint: Maint[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_maintenance_mesin') || '[]'); } catch { return []; } }, []);
-  const overhead: Overhead[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_overhead_pabrik') || '[]'); } catch { return []; } }, []);
+  // Load all expense datasets from kvStore and subscribe
+  const [gaji, setGaji] = useState<Gaji[]>([]);
+  const [belanja, setBelanja] = useState<Belanja[]>([]);
+  const [fee, setFee] = useState<Fee[]>([]);
+  const [ads, setAds] = useState<Ads[]>([]);
+  const [ongkir, setOngkir] = useState<Ongkir[]>([]);
+  const [maint, setMaint] = useState<Maint[]>([]);
+  const [overhead, setOverhead] = useState<Overhead[]>([]);
+
+  useEffect(() => {
+    let mounted = true;
+    const KEYS = ['pengeluaran_gaji','pengeluaran_belanja_logistik','pengeluaran_fee_jaringan','pengeluaran_marketing_ads','pengeluaran_ongkir','pengeluaran_maintenance_mesin','pengeluaran_overhead_pabrik'] as const;
+    const loadAll = async () => {
+      try {
+        const [g, b, f, a, o, m, ov] = await Promise.all(KEYS.map(k => kvStore.get(k)));
+        if (!mounted) return;
+        try { setGaji(Array.isArray(g) ? (g as Gaji[]) : (g ? JSON.parse(String(g)) : [])); } catch { setGaji([]); }
+        try { setBelanja(Array.isArray(b) ? (b as Belanja[]) : (b ? JSON.parse(String(b)) : [])); } catch { setBelanja([]); }
+        try { setFee(Array.isArray(f) ? (f as Fee[]) : (f ? JSON.parse(String(f)) : [])); } catch { setFee([]); }
+        try { setAds(Array.isArray(a) ? (a as Ads[]) : (a ? JSON.parse(String(a)) : [])); } catch { setAds([]); }
+        try { setOngkir(Array.isArray(o) ? (o as Ongkir[]) : (o ? JSON.parse(String(o)) : [])); } catch { setOngkir([]); }
+        try { setMaint(Array.isArray(m) ? (m as Maint[]) : (m ? JSON.parse(String(m)) : [])); } catch { setMaint([]); }
+        try { setOverhead(Array.isArray(ov) ? (ov as Overhead[]) : (ov ? JSON.parse(String(ov)) : [])); } catch { setOverhead([]); }
+      } catch {}
+    };
+    (async () => {
+      await loadAll();
+      const subs: Array<{ unsubscribe: () => void }> = [];
+      for (const k of KEYS) {
+        try { subs.push(kvStore.subscribe(k, () => { try { loadAll(); } catch {} })); } catch {}
+      }
+      return () => { subs.forEach(s => { try { s.unsubscribe(); } catch {} }); };
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // Filter by selected month
   const gajiM = useMemo(() => gaji.filter(i => i.date?.startsWith(`${month}-`)), [gaji, month]);

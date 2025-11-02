@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import kvStore from '../../../lib/kvStore';
 import {
     Box,
     Table,
@@ -53,25 +54,25 @@ export default function DatabaseProduk() {
         setSelectedProdukId(null);
     };
 
-    // Load data dari localStorage
+    // Load data from kvStore and subscribe for updates
     useEffect(() => {
-        loadDatabaseProduk();
-    }, []);
-
-    const loadDatabaseProduk = () => {
-        try {
-            const storedData = localStorage.getItem('database_produk');
-            if (storedData) {
-                setProdukList(JSON.parse(storedData));
-            } else {
-                setProdukList([]);
-                localStorage.setItem('database_produk', JSON.stringify([]));
+        let mounted = true;
+        const load = async () => {
+            try {
+                let arr: any[] = [];
+                try { const raw = await kvStore.get('database_produk'); arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { arr = []; }
+                if (mounted) setProdukList(arr);
+            } catch (e) {
+                console.error('Error loading database produk:', e);
+                if (mounted) setAlert({ type: 'error', message: 'Gagal memuat data produk' });
             }
-        } catch (error) {
-            console.error('Error loading database produk:', error);
-            setAlert({ type: 'error', message: 'Gagal memuat data produk' });
-        }
-    };
+        };
+        load();
+        const sub = kvStore.subscribe('database_produk', (v: any) => {
+            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setProdukList(arr); } catch {}
+        });
+        return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+    }, []);
 
     const handleSearch = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;

@@ -1,5 +1,6 @@
 import { Alert, Box, Button, Grid, Paper, Select, MenuItem, Snackbar, Stack, TextField, Typography, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, RadioGroup, FormControlLabel, Radio } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import kvStore from '../../lib/kvStore';
 import { useNavigate, useSearchParams } from 'react-router-dom';
 
 type AnyRec = Record<string, any>;
@@ -8,22 +9,24 @@ const LS_KEY = 'spk_design';
 const ORDER_SNAP_KEY = 'spk_orders';
 const INPUT_QUEUE_KEY = 'antrian_input_desain';
 
-function loadDesignSnapshot(idSpk: string): AnyRec | null {
+// Helpers: async accessors for snapshots
+async function loadDesignSnapshotAsync(idSpk: string): Promise<AnyRec | null> {
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    const map = raw ? JSON.parse(raw) : {};
+    const raw = await kvStore.get(LS_KEY);
+    const map = raw && typeof raw === 'object' ? raw : (typeof raw === 'string' ? JSON.parse(raw) : {});
     const snap = map?.[idSpk] || null;
-    return snap && typeof snap === 'object' ? snap : null;
+    if (snap && typeof snap === 'object') return snap;
   } catch { return null; }
+  return null;
 }
 
-function saveDesignSnapshot(idSpk: string, patch: AnyRec) {
+async function saveDesignSnapshotAsync(idSpk: string, patch: AnyRec) {
   try {
-    const raw = localStorage.getItem(LS_KEY);
-    const map = raw ? JSON.parse(raw) : {};
+    const raw = await kvStore.get(LS_KEY) || {};
+    const map = raw && typeof raw === 'object' ? raw : (typeof raw === 'string' ? JSON.parse(raw) : {});
     const prev = map?.[idSpk] || {};
     map[idSpk] = { ...prev, ...patch };
-    localStorage.setItem(LS_KEY, JSON.stringify(map));
+    await kvStore.set(LS_KEY, map);
     return true;
   } catch { return false; }
 }
@@ -111,8 +114,8 @@ export default function RevisiSpk() {
   const [proof, setProof] = useState<string | null>(null);
 
   // Auto-load snapshot when idSpk set
-  const loadById = (id: string) => {
-    const snap = loadDesignSnapshot(id);
+  const loadById = async (id: string) => {
+    const snap = await loadDesignSnapshotAsync(id);
     if (!snap) {
       setSnack({ open: true, message: 'Snapshot desain belum ada untuk ID ini. Anda bisa mengisi baru lalu Simpan.', severity: 'info' });
       // reset design fields
@@ -120,7 +123,7 @@ export default function RevisiSpk() {
       setApplication(''); setBordir(''); setSablon(''); setJahitan(''); setHoodie(''); setCuttingButtom(''); setSideSlit(''); setNeck(''); setPlacard(''); setPocket(''); setBottomPocket(''); setFuringPocket(''); setArmEnd(''); setFrontButton('');
       setBottomStrap(''); setArmStrap(''); setBottomTire(''); setSkoder(''); setPocketVariant(''); setReflector(''); setColorReflector(''); setVentilation(''); setJahitanVentilasiHorz(''); setPenHolder(''); setCatTongue(''); setLanyardHolder(''); setHTHanger('');
       setAssetLink(''); setCatatan('');
-    } else {
+  } else {
       // Spesifikasi
       setNameDesign(snap.nameDesign || snap.namaDesain || '');
       setSample(snap.sample || '');
@@ -166,12 +169,12 @@ export default function RevisiSpk() {
 
     // Load order snapshot (spk_orders -> antrian_input_desain fallback)
     try {
-      const orderRaw = localStorage.getItem(ORDER_SNAP_KEY);
-      const orderMap = orderRaw ? JSON.parse(orderRaw) : {};
+      const orderRaw = await kvStore.get(ORDER_SNAP_KEY) || {};
+      const orderMap = orderRaw && typeof orderRaw === 'object' ? orderRaw : (typeof orderRaw === 'string' ? JSON.parse(orderRaw) : {});
       let ord = orderMap?.[id] || null;
       if (!ord) {
-        const qRaw = localStorage.getItem(INPUT_QUEUE_KEY);
-        const qList = qRaw ? JSON.parse(qRaw) : [];
+        const qRaw = await kvStore.get(INPUT_QUEUE_KEY) || [];
+        const qList = Array.isArray(qRaw) ? qRaw : (typeof qRaw === 'string' ? JSON.parse(qRaw) : []);
         ord = qList.find((r: AnyRec) => String(r?.idSpk || '') === String(id)) || null;
       }
       if (ord) {
@@ -199,10 +202,7 @@ export default function RevisiSpk() {
 
   useEffect(() => {
     const q = params.get('idSpk') || '';
-    if (q) {
-      setIdInput(q);
-      loadById(q);
-    }
+    if (q) { setIdInput(q); (async () => { await loadById(q); })(); }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   // Load wilayah options and cascade loaders like InputPesanan
@@ -252,15 +252,15 @@ export default function RevisiSpk() {
     })();
   }, [district, districts]);
 
-  const onLoadClick = () => {
+  const onLoadClick = async () => {
     if (!idSpk) { setSnack({ open: true, message: 'Isi ID SPK terlebih dahulu.', severity: 'error' }); return; }
     const p = new URLSearchParams(params);
     p.set('idSpk', idSpk);
     setParams(p, { replace: true });
-    loadById(idSpk);
+    await loadById(idSpk);
   };
 
-  const onSave = () => {
+  const onSave = async () => {
     if (!idSpk) { setSnack({ open: true, message: 'ID SPK belum diisi.', severity: 'error' }); return; }
     const patch: AnyRec = {
       idSpk,
@@ -321,7 +321,7 @@ export default function RevisiSpk() {
       colorReflectorLabel: colorReflector,
       ventilationLabel: ventilation,
     };
-    const ok = saveDesignSnapshot(idSpk, patch);
+    const ok = await saveDesignSnapshotAsync(idSpk, patch);
     setSnack({ open: true, message: ok ? 'Revisi SPK tersimpan.' : 'Gagal menyimpan revisi.', severity: ok ? 'success' : 'error' });
   };
 
@@ -655,7 +655,7 @@ export default function RevisiSpk() {
 
         <Stack direction="row" spacing={1} justifyContent="flex-end">
           <Button variant="outlined" onClick={() => { if (idSpk) loadById(idSpk); }}>Reset Perubahan</Button>
-          <Button variant="contained" color="success" onClick={() => {
+          <Button variant="contained" color="success" onClick={async () => {
             if (!idSpk) { setSnack({ open: true, message: 'ID SPK belum diisi.', severity: 'error' }); return; }
             // 1) Simpan snapshot PESANAN -> spk_orders
             try {
@@ -674,10 +674,12 @@ export default function RevisiSpk() {
                 nominal,
                 proof,
               };
-              const raw = localStorage.getItem(ORDER_SNAP_KEY);
-              const map = raw ? JSON.parse(raw) : {};
-              map[String(idSpk)] = payload;
-              localStorage.setItem(ORDER_SNAP_KEY, JSON.stringify(map));
+              try {
+                const raw = await kvStore.get(ORDER_SNAP_KEY) || {};
+                const map = raw && typeof raw === 'object' ? raw : (typeof raw === 'string' ? JSON.parse(raw) : {});
+                map[String(idSpk)] = payload;
+                await kvStore.set(ORDER_SNAP_KEY, map);
+              } catch {}
             } catch {}
 
             // 2) Simpan snapshot DESAIN -> spk_design (pakai onSave)

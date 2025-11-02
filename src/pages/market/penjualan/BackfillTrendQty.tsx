@@ -1,18 +1,19 @@
 import { Box, Button, Typography, Alert } from '@mui/material';
 import { useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 
 export default function BackfillTrendQty() {
   const [result, setResult] = useState<string>('');
   const [error, setError] = useState<string>('');
 
-  const run = () => {
+  const run = async () => {
     setError('');
     try {
       const trendKey = 'database_trend';
-      const trendRaw = localStorage.getItem(trendKey);
-      const trendList: Array<any> = trendRaw ? JSON.parse(trendRaw) : [];
-      const queueRaw = localStorage.getItem('antrian_input_desain');
-      const queue: Array<any> = queueRaw ? JSON.parse(queueRaw) : [];
+      let trendList: Array<any> = [];
+      try { const tr = await kvStore.get(trendKey); trendList = Array.isArray(tr) ? tr : (tr ? JSON.parse(String(tr)) : []); } catch { trendList = []; }
+      let queue: Array<any> = [];
+      try { const qr = await kvStore.get('antrian_input_desain'); queue = Array.isArray(qr) ? qr : (qr ? JSON.parse(String(qr)) : []); } catch { queue = []; }
 
       const sanitize = (v: any) => {
         const n = Number(String(v ?? '').replace(/[^\d-]/g, ''));
@@ -38,7 +39,7 @@ export default function BackfillTrendQty() {
         return t;
       });
 
-      localStorage.setItem(trendKey, JSON.stringify(newTrend));
+      try { await kvStore.set(trendKey, newTrend); } catch {}
       setResult(`Backfill selesai. Baris diperbarui: ${updated}`);
     } catch (e: any) {
       setError('Gagal menjalankan backfill.');

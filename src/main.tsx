@@ -2,7 +2,7 @@ import { StrictMode } from 'react'
 import { createRoot } from 'react-dom/client'
 import './index.css'
 import App from './App.tsx'
-import { initCloudStorageBridge } from './lib/cloudStorageBridge'
+import kvStore from './lib/kvStore'
 import { createBrowserRouter, RouterProvider } from 'react-router-dom'
 import Layout from './layouts/Layout.tsx'
 import InputPesanan from './pages/market/InputPesanan.tsx'
@@ -109,7 +109,7 @@ import LembarStockTransaksi from './pages/method/update-divisi/lembar-kerja/stoc
 import Pengiriman from './pages/method/update-divisi/lembar-kerja/pengiriman/Pengiriman.tsx'
 import LembarPengiriman from './pages/method/update-divisi/lembar-kerja/pengiriman/LembarPengiriman.tsx'
 
-// Optional: allow manual reset by visiting any route with ?reset=all
+// Optional: allow manual reset by visiting any route with ?reset=all (kvStore only)
 try {
   const url = new URL(window.location.href);
   if (url.searchParams.get('reset') === 'all') {
@@ -126,9 +126,9 @@ try {
       'database_sebaran',
       'omset_pendapatan',
       'current_spk_context',
-  'pelunasan_transaksi',
+      'pelunasan_transaksi',
     ];
-    keysToClear.forEach(k => localStorage.removeItem(k));
+    await Promise.all(keysToClear.map((k) => kvStore.remove(k)));
     // strip the reset param and reload
     url.searchParams.delete('reset');
     window.history.replaceState({}, '', url.toString());
@@ -347,8 +347,7 @@ const router = createBrowserRouter([
   }
 ])
 
-// Ensure cloud sync is hydrated before first render (top-level await supported by Vite)
-await initCloudStorageBridge();
+// CloudStorageBridge removed: kvStore is the single source of truth across the app
 
 createRoot(document.getElementById('root')!).render(
   <StrictMode>

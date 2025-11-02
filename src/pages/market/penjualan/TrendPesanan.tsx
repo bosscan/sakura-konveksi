@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react';
+import kvStore from '../../../lib/kvStore';
 import {
     Box,
     Table,
@@ -39,25 +40,25 @@ export default function TrendPesanan() {
     const [endDate, setEndDate] = useState<string>('');
     
 
-    // Load data dari localStorage
+    // Load data from kvStore and subscribe
     useEffect(() => {
-        loadTrendData();
-    }, []);
-
-    const loadTrendData = () => {
-        try {
-            const storedData = localStorage.getItem('database_trend');
-            if (storedData) {
-                setTrendList(JSON.parse(storedData));
-            } else {
-                setTrendList([]);
-                localStorage.setItem('database_trend', JSON.stringify([]));
+        let mounted = true;
+        const load = async () => {
+            try {
+                let arr: any[] = [];
+                try { const raw = await kvStore.get('database_trend'); arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { arr = []; }
+                if (mounted) setTrendList(arr);
+            } catch (e) {
+                console.error('Error loading trend data:', e);
+                if (mounted) setAlert({ type: 'error', message: 'Gagal memuat data trend' });
             }
-        } catch (error) {
-            console.error('Error loading trend data:', error);
-            setAlert({ type: 'error', message: 'Gagal memuat data trend' });
-        }
-    };
+        };
+        load();
+        const sub = kvStore.subscribe('database_trend', (v: any) => {
+            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setTrendList(arr); } catch {}
+        });
+        return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+    }, []);
 
     
 

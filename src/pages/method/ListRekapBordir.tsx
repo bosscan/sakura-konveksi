@@ -1,6 +1,7 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography } from "@mui/material";
 import { useEffect, useMemo, useRef, useState } from "react";
 import TableExportToolbar from "../../components/TableExportToolbar";
+import kvStore from "../../lib/kvStore";
 
 type RekapItem = {
   idRekapProduksi: string;
@@ -25,12 +26,26 @@ export default function ListRekapBordir() {
   const [data, setData] = useState<RekapBordir[]>([]);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem("method_rekap_bordir");
-      setData(raw ? JSON.parse(raw) : []);
-    } catch {
-      setData([]);
-    }
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get("method_rekap_bordir");
+        const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setData(list);
+      } catch { if (mounted) setData([]); }
+    };
+    (async () => {
+      await refresh();
+      try {
+        const sub = kvStore.subscribe("method_rekap_bordir", () => { try { refresh(); } catch {} });
+        const timer = setInterval(refresh, 3000);
+        return () => { try { sub.unsubscribe(); } catch {}; clearInterval(timer); };
+      } catch {
+        const timer = setInterval(refresh, 2000);
+        return () => clearInterval(timer);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const rows = useMemo(() => {

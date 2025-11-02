@@ -1,5 +1,6 @@
 import { Box, Button, Grid, Typography, TextField, Select, MenuItem } from '@mui/material'
 import { useState } from 'react';
+import kvStore from '../../../../lib/kvStore';
 import { useNavigate } from 'react-router-dom';
 import { useEffect } from 'react';
 
@@ -99,7 +100,7 @@ export default function InputSpesifikasi() {
     //             })();
     // }, []);
 
-    // Save form data to localStorage whenever it changes
+    // Save form data to KV (with localStorage fallback) whenever it changes
     useEffect(() => {
         const formData = {
             nameDesign,
@@ -111,8 +112,11 @@ export default function InputSpesifikasi() {
             colorCombination,
             codeColor,
         };
-        // const key = `inputDetailForm_${spkId}`
-        localStorage.setItem('inputDetailForm', JSON.stringify(formData));
+        (async () => {
+            try {
+                await kvStore.set('inputDetailForm', formData);
+            } catch {}
+        })();
     }, [nameDesign, sample, product, pattern, fabric, fabricColor, colorCombination, codeColor]);
 
     return (

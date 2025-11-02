@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
+import kvStore from '../../../lib/kvStore';
 import {
     Box,
     Table,
@@ -44,25 +45,25 @@ const DatabaseKonsumen: React.FC = () => {
     const [alert, setAlert] = useState<{ type: 'success' | 'error'; message: string } | null>(null);
     const [selectedDate, setSelectedDate] = useState<string>('');
 
-    // Load data dari localStorage
+    // Load data from kvStore only
     useEffect(() => {
-        loadKonsumenData();
-    }, []);
-
-    const loadKonsumenData = () => {
-        try {
-            const storedData = localStorage.getItem('database_konsumen');
-            if (storedData) {
-                setKonsumenList(JSON.parse(storedData));
-            } else {
-                setKonsumenList([]);
-                localStorage.setItem('database_konsumen', JSON.stringify([]));
+        let mounted = true;
+        const loadKonsumenData = async () => {
+            try {
+                let arr: any[] = [];
+                try { const raw = await kvStore.get('database_konsumen'); arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { arr = []; }
+                if (mounted) setKonsumenList(arr);
+            } catch (error) {
+                console.error('Error loading konsumen data:', error);
+                if (mounted) setAlert({ type: 'error', message: 'Gagal memuat data konsumen' });
             }
-        } catch (error) {
-            console.error('Error loading konsumen data:', error);
-            setAlert({ type: 'error', message: 'Gagal memuat data konsumen' });
-        }
-    };
+        };
+        loadKonsumenData();
+        const sub = kvStore.subscribe('database_konsumen', (v: any) => {
+            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) setKonsumenList(arr); } catch {}
+        });
+        return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+    }, []);
 
 
     const handleWhatsapp = (telepon: string) => {

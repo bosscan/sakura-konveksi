@@ -3,6 +3,7 @@ import { Box, Typography, Grid, TextField, Button, TableContainer, Table, Paper,
 import { BarChart } from '@mui/x-charts/BarChart';
 import { ResponsiveContainer, ComposedChart, Line as RLine, XAxis as RXAxis, YAxis as RYAxis, CartesianGrid, Tooltip as RTooltip, Legend as RLegend, Bar as RBar } from 'recharts';
 import TableExportToolbar from '../../../components/TableExportToolbar';
+import kvStore from '../../../lib/kvStore';
 
 type Row = {
   id: number;
@@ -35,13 +36,29 @@ const OmsetKumulatif: React.FC = () => {
   const now = new Date();
   const defaultMonth = useMemo(() => `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`,[now]);
   const [month, setMonth] = useState<string>(defaultMonth); // YYYY-MM
-  const [version, setVersion] = useState(0);
+  const [records, setRecords] = useState<Array<{ tanggal: string; tipeTransaksi: string; nominal: number }>>([]);
 
   useEffect(() => {
-    const onStorage = (e: StorageEvent) => { if (e.key === 'omset_pendapatan') setVersion(v => v + 1); };
-    window.addEventListener('storage', onStorage);
-    const t = setInterval(() => setVersion(v => v + 1), 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get('omset_pendapatan');
+        const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setRecords(list);
+      } catch { if (mounted) setRecords([]); }
+    };
+    (async () => {
+      await refresh();
+      try {
+        const sub = kvStore.subscribe('omset_pendapatan', () => { try { refresh(); } catch {} });
+        const t = setInterval(refresh, 3000);
+        return () => { try { sub.unsubscribe(); } catch {}; clearInterval(t); };
+      } catch {
+        const t = setInterval(refresh, 2000);
+        return () => clearInterval(t);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const { periodEndYMD, isCurrentMonth, monthLabel } = useMemo(() => {
@@ -59,8 +76,7 @@ const OmsetKumulatif: React.FC = () => {
   }, [month, now]);
 
   const filtered: Row[] = useMemo(() => {
-    const raw = localStorage.getItem('omset_pendapatan');
-    const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = raw ? JSON.parse(raw) : [];
+    const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = records || [];
     const prefix = month ? `${month}-` : '';
     const map = new Map<string, Row>();
     list.forEach((r) => {
@@ -79,7 +95,7 @@ const OmsetKumulatif: React.FC = () => {
       map.set(date, cur);
     });
     return Array.from(map.values()).sort((a,b) => a.date.localeCompare(b.date)).map((v, i) => ({ ...v, id: i + 1 }));
-  }, [month, isCurrentMonth, periodEndYMD, version]);
+  }, [month, isCurrentMonth, periodEndYMD, records]);
 
   const totals = useMemo(() => {
     return filtered.reduce(

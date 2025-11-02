@@ -2,6 +2,7 @@ import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, Tabl
 import CloseIcon from '@mui/icons-material/Close';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import { useEffect, useRef, useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 import TableExportToolbar from '../../../components/TableExportToolbar';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
@@ -156,64 +157,65 @@ export default function PraProduksiAntrian() {
     return Object.values(assetMap) as QueueItem['assets']
   }
 
-  const persistDesignQueue = (list: QueueItem[]) => {
+  const persistDesignQueue = async (list: QueueItem[]) => {
     try {
-      localStorage.setItem('design_queue', JSON.stringify(list));
+      await kvStore.set('design_queue', list);
       return true;
     } catch (err) {
-      console.error('persistDesignQueue initial failed, try shrink', err);
+      console.error('persistDesignQueue failed to write to kvStore, try shrinking and retry', err);
       try {
-        // Shrink existing stored list (remove any file base64 already saved previously)
-        const raw = localStorage.getItem('design_queue');
-        const existing: QueueItem[] = raw ? JSON.parse(raw) : [];
-        const shrunk = existing.map((it) => ({
-          ...it,
-          assets: sanitizeAssetsFile(it.assets),
-          worksheet: it.worksheet ? sanitizeWorksheet(it.worksheet) : undefined,
-        }));
-        localStorage.setItem('design_queue', JSON.stringify(shrunk));
-      } catch (e2) {
-        console.error('persistDesignQueue shrink existing failed', e2);
-      }
-      try {
-        // Also shrink the list to be saved, then retry
         const shrunkList = list.map((it) => ({
           ...it,
           assets: sanitizeAssetsFile(it.assets),
           worksheet: it.worksheet ? sanitizeWorksheet(it.worksheet) : undefined,
         }));
-        localStorage.setItem('design_queue', JSON.stringify(shrunkList));
+        await kvStore.set('design_queue', shrunkList);
         return true;
-      } catch (e3) {
-        console.error('persistDesignQueue retry failed', e3);
+      } catch (e2) {
+        console.error('persistDesignQueue retry failed', e2);
         return false;
       }
     }
   };
 
   useEffect(() => {
-    const refresh = () => {
-      const raw = localStorage.getItem('design_queue');
-      const list: QueueItem[] = raw ? JSON.parse(raw) : [];
-      // Pastikan setiap item punya queueId unik
+    let mounted = true;
+    const ensureQueueIds = (list: QueueItem[]) => {
       let mutated = false;
       for (const it of list) {
         if (!it.queueId) { (it as any).queueId = (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`); mutated = true; }
       }
-      if (mutated) {
-        try { localStorage.setItem('design_queue', JSON.stringify(list)); } catch { }
-      }
-      const filtered = list.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
-      setRows(filtered);
+      return mutated;
     };
+
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get('design_queue');
+        const list: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (ensureQueueIds(list)) {
+          try { await kvStore.set('design_queue', list); } catch {}
+        }
+        const filtered = list.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
+        if (mounted) setRows(filtered);
+      } catch (err) { if (mounted) setRows([]); }
+    };
+
     refresh();
-    const onStorage = (e: StorageEvent) => { if (e.key === 'design_queue') refresh(); };
-    window.addEventListener('storage', onStorage);
-    const timer = setInterval(refresh, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    // Subscribe to kvStore updates so changes from other devices propagate
+    try {
+      kvStore.subscribe('design_queue', (v) => {
+        try {
+          const list: QueueItem[] = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []);
+          const filtered = list.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
+          if (mounted) setRows(filtered);
+        } catch { }
+      });
+    } catch {}
+
+    return () => { mounted = false; };
   }, []);
 
-  const handleKerjakan = (rekapId: string, idSpk?: string) => {
+  const handleKerjakan = async (rekapId: string, idSpk?: string) => {
     // Pilih item unik berdasarkan kombinasi Rekap + SPK
     const found = rows.find(r => r.idRekapCustom === rekapId && String(r.idSpk || '') === String(idSpk || '')) || null;
     if (!found) return;
@@ -235,65 +237,53 @@ export default function PraProduksiAntrian() {
     });
     setOpen(true);
     // also persist status change immediately
-    // update in full list stored, then refresh filtered view
-    const allRaw = localStorage.getItem('design_queue');
-    const allList: QueueItem[] = allRaw ? JSON.parse(allRaw) : [];
-    const updAll = allList.map(it => (it.idRekapCustom === rekapId && String(it.idSpk || '') === String(idSpk || '')) ? { ...it, status: 'Sedang dikerjakan' } : it);
-    const ok = persistDesignQueue(updAll);
-    if (!ok) {
-      setSnack({ open: true, message: 'Gagal mengubah status ke Sedang dikerjakan (penyimpanan).', severity: 'error' });
-    }
-    const filtered = updAll.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
-    setRows(filtered);
+    try {
+      const raw = await kvStore.get('design_queue');
+      const allList: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+      const updAll = allList.map(it => (it.idRekapCustom === rekapId && String(it.idSpk || '') === String(idSpk || '')) ? { ...it, status: 'Sedang dikerjakan' } : it);
+      const ok = await persistDesignQueue(updAll);
+      if (!ok) setSnack({ open: true, message: 'Gagal mengubah status ke Sedang dikerjakan (penyimpanan).', severity: 'error' });
+      const filtered = updAll.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
+      setRows(filtered);
+    } catch { setSnack({ open: true, message: 'Gagal menyimpan status (server).', severity: 'error' }); }
   };
 
   const handleClose = () => { setOpen(false); setActive(null); };
 
-  const persist = (list: QueueItem[]) => persistDesignQueue(list);
+  const persist = async (list: QueueItem[]) => await persistDesignQueue(list);
 
-  const handleSaveWorksheet = () => {
+  const handleSaveWorksheet = async () => {
     if (!active || !ws) return;
-
-    const allRaw = localStorage.getItem('design_queue');
-    const allList: QueueItem[] = allRaw ? JSON.parse(allRaw) : [];
-
-    const updatedAssets = updateAssetsFromWorksheet(active.assets || [], ws)
-
-    const safeWs = sanitizeWorksheet(ws, catatan);
-    const updAll = allList.map(it => 
-      (it.idRekapCustom === active.idRekapCustom && String(it.idSpk || '') === String((active).idSpk || ''))
-       ? { 
-        ...it, 
-        status, 
-        worksheet: safeWs, 
-        assets: updatedAssets
-      } 
-        : it);
-
-    const ok = persist(updAll);
-    if (!ok) {
-      setSnack({ open: true, message: 'Gagal menyimpan perubahan ke localStorage.', severity: 'error' });
-      return;
-    }
-    // Persist thumbnail mockup ringan ke map agar bisa dipreview di Antrian Pengerjaan
     try {
-      if (active?.queueId && (ws?.mockup?.file || '')) {
-        const mapKey = 'mockup_thumb_map';
-        const rawMap = localStorage.getItem(mapKey);
-        const thumbMap = rawMap ? JSON.parse(rawMap) : {};
-        thumbMap[active.queueId] = ws.mockup.file; // di titik ini file masih ada di memori; map bisa ditimpa nantinya saat selesai
-        localStorage.setItem(mapKey, JSON.stringify(thumbMap));
-      }
-    } catch { }
-
-    const filtered = updAll.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
-    setRows(filtered);
-    setOpen(false);
-    setActive(null);
-    setSnack({ open: true, message: 'Worksheet dan disimpan', severity: 'success' });
+      const raw = await kvStore.get('design_queue');
+      const allList: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+      const updatedAssets = updateAssetsFromWorksheet(active.assets || [], ws)
+      const safeWs = sanitizeWorksheet(ws, catatan);
+      const updAll = allList.map(it => (it.idRekapCustom === active.idRekapCustom && String(it.idSpk || '') === String((active).idSpk || ''))
+        ? { ...it, status, worksheet: safeWs, assets: updatedAssets }
+        : it);
+      const ok = await persist(updAll);
+      if (!ok) { setSnack({ open: true, message: 'Gagal menyimpan perubahan ke server.', severity: 'error' }); return; }
+      // Persist thumbnail mockup ringan ke map agar bisa dipreview di Antrian Pengerjaan
+      try {
+        if (active?.queueId && (ws?.mockup?.file || '')) {
+          const mapKey = 'mockup_thumb_map';
+          const rawMap = await kvStore.get(mapKey);
+          const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap : (rawMap ? JSON.parse(String(rawMap)) : {});
+          thumbMap[active.queueId] = ws.mockup.file;
+          await kvStore.set(mapKey, thumbMap);
+        }
+      } catch { }
+      const filtered = updAll.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
+      setRows(filtered);
+      setOpen(false);
+      setActive(null);
+      setSnack({ open: true, message: 'Worksheet dan disimpan', severity: 'success' });
+      return;
+    } catch { setSnack({ open: true, message: 'Gagal menyimpan perubahan.', severity: 'error' }); }
   };
 
-  const handleSelesaiDesain = () => {
+  const handleSelesaiDesain = async () => {
     if (saving) { console.log('handleSelesaiDesain skipped: saving in progress'); return; }
     setSaving(true);
 
@@ -311,8 +301,8 @@ export default function PraProduksiAntrian() {
         return;
       }
 
-      const allRaw = localStorage.getItem('design_queue');
-      let allList: QueueItem[] = allRaw ? JSON.parse(allRaw) : [];
+  const raw = await kvStore.get('design_queue');
+  let allList: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
 
       const updatedAssets = updateAssetsFromWorksheet(active.assets || [], ws!)
 
@@ -362,29 +352,29 @@ export default function PraProduksiAntrian() {
         });
       }
       console.log('handleSelesaiDesain persist', { total: allList.length, matched, idRekapActive, idSpkActive });
-      const ok = persist(updAll);
+      const ok = await persist(updAll);
       if (!ok) {
-        console.error('persist design_queue failed after retry');
-        setSnack({ open: true, message: 'Gagal menyimpan perubahan ke localStorage.', severity: 'error' });
+        console.error('persist design_queue failed');
+        setSnack({ open: true, message: 'Gagal menyimpan perubahan ke server.', severity: 'error' });
         return;
       }
       // Pindahkan ke antrian market: antrian_pengerjaan_desain
       try {
-        const rawNext = localStorage.getItem('antrian_pengerjaan_desain');
-        const nextList = rawNext ? JSON.parse(rawNext) : [];
+        const rawNext = await kvStore.get('antrian_pengerjaan_desain');
+        const nextList = Array.isArray(rawNext) ? rawNext : (rawNext ? JSON.parse(String(rawNext)) : []);
         const moved = { ...active, status: 'Menunggu validasi', worksheet: safeWs, assets: sanitizeAssetsFile(active.assets) } as any;
         if (!moved.queueId) moved.queueId = active.queueId || (crypto?.randomUUID ? crypto.randomUUID() : `${Date.now()}-${Math.random()}`);
         nextList.push(moved);
-        localStorage.setItem('antrian_pengerjaan_desain', JSON.stringify(nextList));
+        await kvStore.set('antrian_pengerjaan_desain', nextList);
         // Simpan peta idSpk -> queueId agar Print SPK bisa menemukan thumbnail mockup
         try {
           const idSpkFin = String((active as any)?.idSpk || '');
           if (idSpkFin && moved.queueId) {
             const mapKey = 'design_queueid_by_spk';
-            const raw = localStorage.getItem(mapKey);
-            const map = raw ? JSON.parse(raw) : {};
+            const raw = await kvStore.get(mapKey);
+            const map = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
             map[idSpkFin] = moved.queueId;
-            localStorage.setItem(mapKey, JSON.stringify(map));
+            await kvStore.set(mapKey, map);
           }
         } catch { }
       } catch (e) { console.warn('move to antrian_pengerjaan_desain failed', e); }
@@ -395,16 +385,16 @@ export default function PraProduksiAntrian() {
         const idSpk = String((active as any).idSpk || '');
         if (idSpk) {
           const pipeKey = 'spk_pipeline';
-          const pipeRaw = localStorage.getItem(pipeKey);
-          const pipeList = pipeRaw ? JSON.parse(pipeRaw) : [];
+          const pipeRaw = await kvStore.get(pipeKey);
+          const pipeList: any[] = Array.isArray(pipeRaw) ? pipeRaw : (pipeRaw ? JSON.parse(String(pipeRaw)) : []);
           const newPipe = pipeList.map((p: any) => p?.idSpk === idSpk ? { ...p, selesaiDesainProduksi: ts } : p);
-          if (JSON.stringify(newPipe) !== JSON.stringify(pipeList)) localStorage.setItem(pipeKey, JSON.stringify(newPipe));
+          if (JSON.stringify(newPipe) !== JSON.stringify(pipeList)) try { await kvStore.set(pipeKey, newPipe); } catch {}
 
           const qKey = 'plotting_rekap_bordir_queue';
-          const qRaw = localStorage.getItem(qKey);
-          const qList = qRaw ? JSON.parse(qRaw) : [];
+          const qRaw = await kvStore.get(qKey);
+          const qList: any[] = Array.isArray(qRaw) ? qRaw : (qRaw ? JSON.parse(String(qRaw)) : []);
           const newQ = qList.map((q: any) => q?.idSpk === idSpk ? { ...q, selesaiDesainProduksi: ts } : q);
-          if (JSON.stringify(newQ) !== JSON.stringify(qList)) localStorage.setItem(qKey, JSON.stringify(newQ));
+          if (JSON.stringify(newQ) !== JSON.stringify(qList)) try { await kvStore.set(qKey, newQ); } catch {}
         }
       } catch (err) {
         console.error('handleSelesaiDesain propagate error', err);
@@ -412,18 +402,7 @@ export default function PraProduksiAntrian() {
       const filteredNow = updAll.filter(it => !['Antrian revisi', 'Selesai', 'Desain di validasi'].includes(it.status || ''));
       console.log('handleSelesaiDesain filteredNow length', filteredNow.length);
       setRows(filteredNow);
-      // Fallback hapus lokal jika belum berkurang
-      try {
-        if (Array.isArray(rows) && filteredNow.length === rows.length) {
-          const afterLocal = rows.filter(r => !(String(r.idRekapCustom) === idRekapActive && String((r as any).idSpk || '') === idSpkActive));
-          if (afterLocal.length !== rows.length) {
-            console.log('handleSelesaiDesain local remove applied');
-            setRows(afterLocal);
-          }
-        }
-      } catch (err) {
-        console.error('local remove fallback error', err);
-      }
+      // Ensure UI reflects removal
       if (matched > 0) {
         setSnack({ open: true, message: 'Desain diselesaikan dan dihapus dari antrian', severity: 'success' });
       } else {
@@ -580,10 +559,10 @@ export default function PraProduksiAntrian() {
                                 try {
                                   if (active?.queueId && thumb) {
                                     const mapKey = 'mockup_thumb_map';
-                                    const rawMap = localStorage.getItem(mapKey);
-                                    const thumbMap = rawMap ? JSON.parse(rawMap) : {};
+                                    const rawMap = await kvStore.get(mapKey);
+                                    const thumbMap = rawMap && typeof rawMap === 'object' ? rawMap : (rawMap ? JSON.parse(String(rawMap)) : {});
                                     thumbMap[active.queueId] = thumb;
-                                    localStorage.setItem(mapKey, JSON.stringify(thumbMap));
+                                    await kvStore.set(mapKey, thumbMap);
                                   }
                                 } catch { }
                               } else if (sec.key === 'cdr') {

@@ -1,7 +1,8 @@
 import { Box, Typography, TextField, Button, Alert, Paper, Stack, FormControlLabel, Checkbox, Link, InputAdornment } from "@mui/material";
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
-import { saveAuth } from "../lib/auth";
+import { saveAuth, LS_KEYS } from "../lib/auth";
+import kvStore from "../lib/kvStore";
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -20,13 +21,17 @@ function Login() {
       { username: 'operator', password: 'operator-sakura', user: 'Marketing', role: 'operator' },
     ];
 
-  // restore remembered username
+  // restore remembered username from kvStore
   useState(() => {
-    const saved = localStorage.getItem('remember_username');
-    if (saved) {
-      setUsername(saved);
-      setRemember(true);
-    }
+    (async () => {
+      try {
+        const saved = await kvStore.get(LS_KEYS.REMEMBER_USERNAME);
+        if (typeof saved === 'string' && saved) {
+          setUsername(saved);
+          setRemember(true);
+        }
+      } catch {}
+    })();
   });
 
   const handleLogin = (e: any) => {
@@ -35,13 +40,13 @@ function Login() {
     setLoading(true);
 
     // tiny delay for UX
-    setTimeout(() => {
+    setTimeout(async () => {
       const user = users.find(u => u.username === username && u.password === password);
       if (user) {
         // persist auth + role
         try {
           // cast to any to satisfy Role typing from helper (roles are controlled strings)
-          saveAuth(user.role as any, username, remember);
+          await saveAuth(user.role as any, username, remember);
         } catch { /* ignore */ }
         navigate('/');
       } else {

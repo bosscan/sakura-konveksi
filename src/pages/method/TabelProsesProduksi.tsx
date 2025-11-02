@@ -1,5 +1,6 @@
 import { Box, Typography, Table, TableHead, TableRow, TableCell, TableBody, Paper, TableContainer, Dialog, DialogTitle, DialogContent } from '@mui/material';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import kvStore from '../../lib/kvStore';
 
 type PipelineItem = {
   idSpk: string;
@@ -67,16 +68,7 @@ const fgFor = (count: number) => (count > 2 ? '#fff' : '#111');
 
 const isDone = (it: PipelineItem, key: keyof PipelineItem) => Boolean((it as any)[key]);
 
-const deriveIdRp = (idSpk?: string): string => {
-  if (!idSpk) return '';
-  try {
-    const raw = localStorage.getItem('production_recap_map');
-    const map = raw ? JSON.parse(raw) : {};
-    const v = map[idSpk];
-    if (v != null) return String(v).padStart(7, '0');
-  } catch {}
-  return '';
-};
+// idSpk -> id rekap produksi mapper is loaded from kvStore
 
 export default function TabelProsesProduksi() {
   const tableRef = useRef<HTMLTableElement | null>(null);
@@ -84,6 +76,7 @@ export default function TabelProsesProduksi() {
   const [rekapCreatedAt, setRekapCreatedAt] = useState<Map<string, string>>(new Map()); // idSpk -> createdAt rekap
   const [spkTerbitMap, setSpkTerbitMap] = useState<Record<string, string>>({}); // idSpk -> tglSpkTerbit
   const [inputDateMap, setInputDateMap] = useState<Record<string, string>>({}); // idSpk -> tanggalInput/desain
+  const [productionRecapMap, setProductionRecapMap] = useState<Record<string, string>>({}); // idSpk -> id rekap produksi (number-like string)
   const [openDialog, setOpenDialog] = useState(false);
   const [dialogTitle, setDialogTitle] = useState('');
   type DialogRow = { namaDesain: string; idTransaksi: string; idSpk: string; jumlahSpk: number; quantity: number };
@@ -91,52 +84,69 @@ export default function TabelProsesProduksi() {
   const [dialogDivisionKey, setDialogDivisionKey] = useState<string>('');
 
   useEffect(() => {
-    const refresh = () => {
+    let mounted = true;
+    const refresh = async () => {
       try {
-        const raw = localStorage.getItem('spk_pipeline');
-        const list: PipelineItem[] = raw ? JSON.parse(raw) : [];
-        setPipeline(list);
-        // Load auxiliary maps for checkout baseline
+        // Main pipeline
         try {
-          const rbRaw = localStorage.getItem('method_rekap_bordir');
-          const rbList: any[] = rbRaw ? JSON.parse(rbRaw) : [];
+          const raw = await kvStore.get('spk_pipeline');
+          const list: PipelineItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+          if (mounted) setPipeline(list);
+        } catch { if (mounted) setPipeline([]); }
+        // Auxiliary: method rekap bordir -> derive createdAt per idSpk
+        try {
+          const rbRaw = await kvStore.get('method_rekap_bordir');
+          const rbList: any[] = Array.isArray(rbRaw) ? rbRaw : (rbRaw ? JSON.parse(String(rbRaw)) : []);
           const map = new Map<string, string>();
           (rbList || []).forEach((rb: any) => {
             const createdAt = rb?.createdAt;
             (rb?.items || []).forEach((it: any) => { if (it?.idSpk && createdAt) map.set(it.idSpk, createdAt); });
           });
-          setRekapCreatedAt(map);
-        } catch {}
+          if (mounted) setRekapCreatedAt(map);
+        } catch { if (mounted) setRekapCreatedAt(new Map()); }
+        // Auxiliary: spk terbit map
         try {
-          const stRaw = localStorage.getItem('spk_terbit_map');
-          setSpkTerbitMap(stRaw ? JSON.parse(stRaw) : {});
-        } catch { setSpkTerbitMap({}); }
+          const stRaw = await kvStore.get('spk_terbit_map');
+          const map = stRaw && typeof stRaw === 'object' ? stRaw as Record<string, string> : (stRaw ? JSON.parse(String(stRaw)) : {});
+          if (mounted) setSpkTerbitMap(map || {});
+        } catch { if (mounted) setSpkTerbitMap({}); }
+        // Auxiliary: antrian input desain -> input date per idSpk
         try {
-          const adRaw = localStorage.getItem('antrian_input_desain');
-          const adList: any[] = adRaw ? JSON.parse(adRaw) : [];
+          const adRaw = await kvStore.get('antrian_input_desain');
+          const adList: any[] = Array.isArray(adRaw) ? adRaw : (adRaw ? JSON.parse(String(adRaw)) : []);
           const imap: Record<string, string> = {};
           (adList || []).forEach((it: any) => {
             const t = it?.tanggalInput || it?.input_date || it?.inputDate || it?.createdAt;
             if (it?.idSpk && typeof t === 'string') imap[it.idSpk] = t;
           });
-          setInputDateMap(imap);
-        } catch { setInputDateMap({}); }
+          if (mounted) setInputDateMap(imap);
+        } catch { if (mounted) setInputDateMap({}); }
+        // Production recap map for deriving id rekap produksi
+        try {
+          const prmRaw = await kvStore.get('production_recap_map');
+          const map = prmRaw && typeof prmRaw === 'object' ? prmRaw as Record<string, string> : (prmRaw ? JSON.parse(String(prmRaw)) : {});
+          if (mounted) setProductionRecapMap(map || {});
+        } catch { if (mounted) setProductionRecapMap({}); }
+      } catch {}
+    };
+    (async () => {
+      await refresh();
+      try {
+        const subs = [
+          kvStore.subscribe('spk_pipeline', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('method_rekap_bordir', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('spk_terbit_map', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('antrian_input_desain', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('production_recap_map', () => { try { refresh(); } catch {} }),
+        ];
+        const timer = setInterval(refresh, 3000);
+        return () => { try { subs.forEach(s => s.unsubscribe()); } catch {} ; clearInterval(timer); };
       } catch {
-        setPipeline([]);
+        const timer = setInterval(refresh, 2000);
+        return () => clearInterval(timer);
       }
-    };
-    refresh();
-    const onStorage = (e: StorageEvent) => {
-      if ([
-        'spk_pipeline',
-        'method_rekap_bordir',
-        'spk_terbit_map',
-        'antrian_input_desain'
-      ].includes(e.key || '')) refresh();
-    };
-    window.addEventListener('storage', onStorage);
-    const timer = setInterval(refresh, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const byTransaksi = useMemo(() => {
@@ -154,13 +164,18 @@ export default function TabelProsesProduksi() {
   const byRekap = useMemo(() => {
     const map = new Map<string, PipelineItem[]>();
     (pipeline || []).forEach((it) => {
-      const rp = deriveIdRp(it.idSpk);
+      const idSpk = it.idSpk;
+      let rp = '';
+      if (idSpk && productionRecapMap && Object.prototype.hasOwnProperty.call(productionRecapMap, idSpk)) {
+        const v = (productionRecapMap as Record<string, any>)[idSpk];
+        if (v != null) rp = String(v).padStart(7, '0');
+      }
       const arr = map.get(rp) || [];
       arr.push(it);
       map.set(rp, arr);
     });
     return map;
-  }, [pipeline]);
+  }, [pipeline, productionRecapMap]);
 
   // Helpers to check membership per division and any-queue
   const isMemberOfDivision = (it: PipelineItem, divKey: typeof divisions[number]['key']): boolean => {

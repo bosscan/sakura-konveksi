@@ -1,5 +1,6 @@
 import { Box, Typography, Grid, TextField, RadioGroup, FormControlLabel, Radio, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Select, MenuItem, Snackbar, Alert } from '@mui/material'
 import { useEffect, useRef, useState } from 'react'
+import kvStore from '../../lib/kvStore'
 import { useNavigate } from 'react-router-dom'
 import TableExportToolbar from '../../components/TableExportToolbar'
 import Api from '../../lib/api'
@@ -49,15 +50,17 @@ function InputPesanan() {
     const [proof, setProof] = useState<string | null>(null); // bukti transaksi
 
     // Generator ID SPK 7 digit (1000001, 1000002, ...)
-    const nextSpkId = () => {
+    const nextSpkId = async () => {
         const key = 'spk_auto_seq';
         try {
-            let seq = parseInt(localStorage.getItem(key) || '1000000', 10);
+            const raw = await kvStore.get(key);
+            let seq = Number.isFinite(Number(raw)) ? parseInt(String(raw), 10) : NaN;
             if (!Number.isFinite(seq) || seq < 1000000) seq = 1000000;
             seq += 1;
-            localStorage.setItem(key, String(seq));
+            await kvStore.set(key, String(seq));
             return String(seq).padStart(7, '0');
         } catch {
+            // If KV unavailable, return a safe default without persisting locally
             return '1000001';
         }
     };
@@ -179,8 +182,8 @@ function InputPesanan() {
             return;
         }
     const key = 'antrian_input_desain';
-        const raw = localStorage.getItem(key);
-        const list = raw ? JSON.parse(raw) : [];
+        let list: any[] = [];
+        try { const raw = await kvStore.get(key); list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { list = []; }
     // Try backend first
     let idSpk = '';
     try {
@@ -201,7 +204,7 @@ function InputPesanan() {
         idSpk = String(orderRes.id_spk || '');
     } catch (e) {
         // Offline fallback: local 7-digit generator
-        idSpk = nextSpkId();
+        idSpk = await nextSpkId();
     }
 
         const payload = {
@@ -220,23 +223,16 @@ function InputPesanan() {
             nominal,
             proof,
         };
-        list.push(payload);
-        localStorage.setItem(key, JSON.stringify(list));
+    list.push(payload);
+    try { await kvStore.set(key, list); } catch {}
         // catat omset pendapatan dari nominal
     const amount = Number(String(nominal || '').replace(/[^\d.-]/g, ''));
         if (!isNaN(amount) && amount > 0) {
             const revKey = 'omset_pendapatan';
-            const revRaw = localStorage.getItem(revKey);
-            const revList = revRaw ? JSON.parse(revRaw) : [];
-            revList.push({
-                id: `OMSET-${Date.now()}`,
-                idSpk,
-                tanggal: new Date().toISOString(),
-                namaPemesan: name,
-                tipeTransaksi: transaction || '-',
-                nominal: amount,
-            });
-            localStorage.setItem(revKey, JSON.stringify(revList));
+            let revList: any[] = [];
+            try { const r = await kvStore.get(revKey); revList = Array.isArray(r) ? r : (r ? JSON.parse(String(r)) : []); } catch { revList = []; }
+            revList.push({ id: `OMSET-${Date.now()}`, idSpk, tanggal: new Date().toISOString(), namaPemesan: name, tipeTransaksi: transaction || '-', nominal: amount });
+            try { await kvStore.set(revKey, revList); } catch {}
             setSnack({ open: true, message: `Pesanan disimpan. Omset tercatat: Rp ${amount.toLocaleString('id-ID')}` as any, severity: 'success' });
         } else {
             setSnack({ open: true, message: 'Pesanan disimpan ke Antrian Input Desain', severity: 'success' });
@@ -245,18 +241,13 @@ function InputPesanan() {
         // 1) Tulis ke Database Konsumen
         try {
             const konsKey = 'database_konsumen';
-            const konsRaw = localStorage.getItem(konsKey);
-            const konsList: Array<{ id: string; nama: string; telepon: string; alamat: string; createdAt: string }>= konsRaw ? JSON.parse(konsRaw) : [];
+            let konsList: any[] = [];
+            try { const r = await kvStore.get(konsKey); konsList = Array.isArray(r) ? r : (r ? JSON.parse(String(r)) : []); } catch { konsList = []; }
             const today = new Date().toISOString().slice(0,10);
             const existsIdx = konsList.findIndex(k => (k.telepon || '').replace(/\D/g,'') === (number || '').replace(/\D/g,''));
             const konsItem = { id: `KONS-${Date.now()}`, nama: name, telepon: number, alamat: address, createdAt: today };
-            if (existsIdx >= 0) {
-                // update minimal fields to latest
-                konsList[existsIdx] = { ...konsList[existsIdx], nama: name, alamat: address, telepon: number, createdAt: konsList[existsIdx].createdAt || today };
-            } else {
-                konsList.push(konsItem);
-            }
-            localStorage.setItem(konsKey, JSON.stringify(konsList));
+            if (existsIdx >= 0) { konsList[existsIdx] = { ...konsList[existsIdx], nama: name, alamat: address, telepon: number, createdAt: konsList[existsIdx].createdAt || today }; } else { konsList.push(konsItem); }
+            try { await kvStore.set(konsKey, konsList); } catch {}
         } catch {}
 
     // 2) Trend Pesanan dicatat dari Input Desain, bukan dari Input Pesanan
@@ -264,8 +255,8 @@ function InputPesanan() {
         // 3) Tulis ke Sebaran Wilayah Penjualan (akumulasi per wilayah)
         try {
             const sebKey = 'database_sebaran';
-            const sebRaw = localStorage.getItem(sebKey);
-            const sebList: Array<{ id: string; kecamatan: string; kabupaten: string; provinsi: string; jumlah_konsumen: string; total_pesanan: string; updatedAt: string }>= sebRaw ? JSON.parse(sebRaw) : [];
+            let sebList: any[] = [];
+            try { const r = await kvStore.get(sebKey); sebList = Array.isArray(r) ? r : (r ? JSON.parse(String(r)) : []); } catch { sebList = []; }
             const today = new Date().toISOString().slice(0,10);
             const kec = district || '-';
             const kab = regency || '-';
@@ -280,7 +271,7 @@ function InputPesanan() {
             } else {
                 sebList.push({ id: `SEB-${Date.now()}`, kecamatan: kec, kabupaten: kab, provinsi: prov, jumlah_konsumen: '1', total_pesanan: String(qty), updatedAt: today });
             }
-            localStorage.setItem(sebKey, JSON.stringify(sebList));
+            try { await kvStore.set(sebKey, sebList); } catch {}
         } catch {}
         // optional: clear list pesanan only
         setItems([]);

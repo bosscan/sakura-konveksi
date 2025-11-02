@@ -1,5 +1,6 @@
 import { Box, Paper, Typography, TextField, Button, Snackbar, Alert, Stack } from '@mui/material';
 import { useMemo, useState } from 'react';
+import kvStore from '../../lib/kvStore';
 
 type PelunasanRecord = {
   idTransaksi: string;
@@ -26,16 +27,15 @@ export default function InputPelunasan() {
     // Load pipeline and update selesaiPelunasan for all items with this idTransaksi
     let updated = false;
     try {
-      const raw = localStorage.getItem('spk_pipeline');
-      const list: any[] = raw ? JSON.parse(raw) : [];
+      const raw = await kvStore.get('spk_pipeline') || [];
+      const list: any[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
       const now = new Date().toISOString();
       for (const it of list) {
         if ((it?.idTransaksi || '').trim() === trx) {
-          // Mark as selesai pelunasan if not already
           if (!it.selesaiPelunasan) { it.selesaiPelunasan = now; updated = true; }
         }
       }
-      if (updated) localStorage.setItem('spk_pipeline', JSON.stringify(list));
+      if (updated) try { await kvStore.set('spk_pipeline', list); } catch {}
     } catch {}
 
     // Persist pelunasan record with optional proof
@@ -53,10 +53,10 @@ export default function InputPelunasan() {
       }
       record = { idTransaksi: trx, nominal: nominalNumber, bukti: proof, createdAt: new Date().toISOString() };
       const key = 'pelunasan_transaksi';
-      const raw = localStorage.getItem(key);
-      const arr: PelunasanRecord[] = raw ? JSON.parse(raw) : [];
+      const raw = await kvStore.get(key) || [];
+      const arr: PelunasanRecord[] = Array.isArray(raw) ? raw : (typeof raw === 'string' ? JSON.parse(raw) : []);
       arr.push(record);
-      localStorage.setItem(key, JSON.stringify(arr));
+      try { await kvStore.set(key, arr); } catch {}
     } catch {}
 
     if (!updated) {

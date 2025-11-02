@@ -1,23 +1,46 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, IconButton, MenuItem, Dialog, DialogTitle, DialogContent, DialogActions, Stack } from '@mui/material';
 import TableExportToolbar from '../../components/TableExportToolbar';
 import Grid from '@mui/material/GridLegacy';
 import DeleteIcon from '@mui/icons-material/Delete';
 import EditIcon from '@mui/icons-material/Edit';
+import kvStore from '../../lib/kvStore';
 
 type Employee = { id: string; name: string; division: string; role: string; status: 'Aktif'|'Nonaktif' };
 const STORAGE_KEY = 'mp_employees';
 
 export default function DataKaryawan() {
-	const [items, setItems] = useState<Employee[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+	const [items, setItems] = useState<Employee[]>([]);
 	const [search, setSearch] = useState('');
 	const [form, setForm] = useState<Omit<Employee,'id'>>({ name:'', division:'Produksi', role:'', status:'Aktif' });
 	const [editing, setEditing] = useState<Employee | null>(null);
-	const save = (list:Employee[])=>{ setItems(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
+
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get(STORAGE_KEY);
+				if (!mounted) return;
+				setItems(Array.isArray(raw) ? raw as Employee[] : []);
+			} catch {
+				if (mounted) setItems([]);
+			}
+			try {
+				const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+					setItems(Array.isArray(v) ? (v as Employee[]) : []);
+				});
+				return () => { mounted = false; sub?.unsubscribe?.(); };
+			} catch {
+				return () => { mounted = false; };
+			}
+		})();
+	}, []);
+
+	const save = async (list:Employee[])=>{ setItems(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
 	const handleChange = (k:keyof typeof form, v:any)=> setForm(f=>({...f,[k]:v}));
-	const add = ()=>{ if(!form.name) return; const next:Employee = { id: crypto.randomUUID(), ...form }; save([next, ...items]); setForm({ name:'', division:'Produksi', role:'', status:'Aktif' }); };
-	const remove = (id:string)=> save(items.filter(i=>i.id!==id));
-	const commitEdit = ()=>{ if(!editing) return; save(items.map(i=> i.id===editing.id? editing: i)); setEditing(null); };
+	const add = async ()=>{ if(!form.name) return; const next:Employee = { id: crypto.randomUUID(), ...form }; await save([next, ...items]); setForm({ name:'', division:'Produksi', role:'', status:'Aktif' }); };
+	const remove = async (id:string)=> { await save(items.filter(i=>i.id!==id)); };
+	const commitEdit = async ()=>{ if(!editing) return; await save(items.map(i=> i.id===editing.id? editing: i)); setEditing(null); };
 	const filtered = useMemo(()=> items.filter(i=> [i.name,i.division,i.role,i.status].join(' ').toLowerCase().includes(search.toLowerCase())), [items, search]);
 	const tableRef = useRef<HTMLTableElement | null>(null);
 

@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Box, Typography, Grid, TextField, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter } from '@mui/material';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type Maint = { id: string; date: string; amount: number };
 const STORAGE_KEY = 'pengeluaran_maintenance_mesin';
@@ -8,7 +9,13 @@ const currency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
 
 const MaintenanceReport: React.FC = () => {
   const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
-  const data: Maint[] = useMemo(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }, []);
+  const [data, setData] = useState<Maint[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? (raw as Maint[]) : (raw ? JSON.parse(String(raw)) : []); if (mounted) setData(list); } catch { if (mounted) setData([]); } };
+    (async () => { await refresh(); try { const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} }); return () => { try { sub.unsubscribe(); } catch {} }; } catch {} })();
+    return () => { mounted = false; };
+  }, []);
   const filtered = useMemo(() => data.filter(i => i.date?.startsWith(`${month}-`)), [data, month]);
   const perDate = useMemo(() => {
     const map = new Map<string, number>();

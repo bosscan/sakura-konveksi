@@ -1,5 +1,6 @@
 import { Box, Button, Grid, Typography, Select, MenuItem } from '@mui/material'
 import { useEffect, useState } from 'react';
+import kvStore from '../../../../lib/kvStore';
 import { useNavigate } from 'react-router-dom';
 
 export default function InputDetail() {
@@ -51,66 +52,74 @@ export default function InputDetail() {
     //     load();
     // }, [])
 
-    // Load previous selections if present
+    // Load previous selections if present (prefer kvStore)
     useEffect(() => {
-        try {
-            const raw = localStorage.getItem('inputProdukForm');
-            if (raw) {
-                const d = JSON.parse(raw);
-                setApplication(d.application || '');
-                setBordir(d.bordir || '');
-                setSablon(d.sablon || '');
-                setJahitan(d.jahitan || '');
-                setHoodie(d.hoodie || '');
-                setCuttingButtom(d.cuttingButtom || '');
-                setSideSlit(d.sideSlit || '');
-                setNeck(d.neck || '');
-                setPlacard(d.placard || '');
-                setPocket(d.pocket || '');
-                setBottomPocket(d.bottomPocket || '');
-                setFuringPocket(d.furingPocket || '');
-                setArmEnd(d.armEnd || '');
-                setFrontButton(d.frontButton || '');
-            }
-        } catch { }
+        let mounted = true;
+        (async () => {
+            try {
+                const raw = await kvStore.get('inputProdukForm');
+                const d = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : null);
+                if (!d) throw new Error('no-kv');
+                if (mounted) {
+                    setApplication(d.application || '');
+                    setBordir(d.bordir || '');
+                    setSablon(d.sablon || '');
+                    setJahitan(d.jahitan || '');
+                    setHoodie(d.hoodie || '');
+                    setCuttingButtom(d.cuttingButtom || '');
+                    setSideSlit(d.sideSlit || '');
+                    setNeck(d.neck || '');
+                    setPlacard(d.placard || '');
+                    setPocket(d.pocket || '');
+                    setBottomPocket(d.bottomPocket || '');
+                    setFuringPocket(d.furingPocket || '');
+                    setArmEnd(d.armEnd || '');
+                    setFrontButton(d.frontButton || '');
+                }
+            } catch {}
+        })();
+        return () => { mounted = false; };
     }, []);
 
-    // Persist on change
+    // Persist on change (async kvStore preferred)
     useEffect(() => {
-        try {
-            const data = {
-                application,
-                bordir,
-                sablon,
-                jahitan,
-                hoodie,
-                cuttingButtom,
-                sideSlit,
-                neck,
-                placard,
-                pocket,
-                bottomPocket,
-                furingPocket,
-                armEnd,
-                frontButton,
-                // Labels for print
-                applicationLabel: getLabel('aplikasi', application),
-                bordirLabel: getLabel('jenis_bordir', bordir),
-                sablonLabel: getLabel('jenis_sablon', sablon),
-                jahitanLabel: getLabel('jahitan', jahitan),
-                hoodieLabel: getLabel('hoodie', hoodie),
-                cuttingButtomLabel: getLabel('potongan_bawah', cuttingButtom),
-                sideSlitLabel: getLabel('belahan_samping', sideSlit),
-                neckLabel: getLabel('kerah', neck),
-                placardLabel: getLabel('plaket', placard),
-                pocketLabel: getLabel('saku', pocket),
-                bottomPocketLabel: getLabel('saku_bawah', bottomPocket),
-                furingPocketLabel: getLabel('saku_furing', furingPocket),
-                armEndLabel: getLabel('ujung_lengan', armEnd),
-                frontButtonLabel: getLabel('kancing_depan', frontButton),
-            };
-            localStorage.setItem('inputProdukForm', JSON.stringify(data));
-        } catch { }
+        const save = async () => {
+            try {
+                const data = {
+                    application,
+                    bordir,
+                    sablon,
+                    jahitan,
+                    hoodie,
+                    cuttingButtom,
+                    sideSlit,
+                    neck,
+                    placard,
+                    pocket,
+                    bottomPocket,
+                    furingPocket,
+                    armEnd,
+                    frontButton,
+                    // Labels for print
+                    applicationLabel: getLabel('aplikasi', application),
+                    bordirLabel: getLabel('jenis_bordir', bordir),
+                    sablonLabel: getLabel('jenis_sablon', sablon),
+                    jahitanLabel: getLabel('jahitan', jahitan),
+                    hoodieLabel: getLabel('hoodie', hoodie),
+                    cuttingButtomLabel: getLabel('potongan_bawah', cuttingButtom),
+                    sideSlitLabel: getLabel('belahan_samping', sideSlit),
+                    neckLabel: getLabel('kerah', neck),
+                    placardLabel: getLabel('plaket', placard),
+                    pocketLabel: getLabel('saku', pocket),
+                    bottomPocketLabel: getLabel('saku_bawah', bottomPocket),
+                    furingPocketLabel: getLabel('saku_furing', furingPocket),
+                    armEndLabel: getLabel('ujung_lengan', armEnd),
+                    frontButtonLabel: getLabel('kancing_depan', frontButton),
+                };
+                await kvStore.set('inputProdukForm', data);
+            } catch {}
+        };
+        save();
     }, [application, bordir, sablon, jahitan, hoodie, cuttingButtom, sideSlit, neck, placard, pocket, bottomPocket, furingPocket, armEnd, frontButton, options]);
 
     return (

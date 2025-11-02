@@ -1,22 +1,44 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, Stack, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, MenuItem } from '@mui/material';
 import { useRef } from 'react';
 import TableExportToolbar from '../../components/TableExportToolbar';
+import kvStore from '../../lib/kvStore';
 
 type Maintenance = { id: string; date: string; machineCode: string; action: string; technician: string; status: 'Selesai'|'Proses'|'Tertunda'; cost: number; note?: string };
 const STORAGE_KEY = 'mesin_maintenance_logs';
 
 export default function ReportMaintenanceMesin() {
 	const tableRef = useRef<HTMLTableElement | null>(null);
-	const [logs, setLogs] = useState<Maintenance[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+	const [logs, setLogs] = useState<Maintenance[]>([]);
 	const [form, setForm] = useState<Omit<Maintenance,'id'>>({ date:new Date().toISOString().slice(0,10), machineCode:'', action:'', technician:'', status:'Selesai', cost:0, note:'' });
 	const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
 	const [status, setStatus] = useState<'ALL'|Maintenance['status']>('ALL');
 	const [search, setSearch] = useState('');
 
-	const save = (list:Maintenance[])=>{ setLogs(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get(STORAGE_KEY);
+				if (!mounted) return;
+				setLogs(Array.isArray(raw) ? raw as Maintenance[] : []);
+			} catch {
+				if (mounted) setLogs([]);
+			}
+			try {
+				const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+					setLogs(Array.isArray(v) ? (v as Maintenance[]) : []);
+				});
+				return () => { mounted = false; sub?.unsubscribe?.(); };
+			} catch {
+				return () => { mounted = false; };
+			}
+		})();
+	}, []);
+
+	const save = async (list:Maintenance[])=>{ setLogs(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
 	const handleChange = (k:keyof typeof form, v:any)=> setForm(f=>({...f,[k]:v}));
-	const add = ()=>{ if(!form.machineCode || !form.action) return; const next:Maintenance = { id: crypto.randomUUID(), ...form }; save([next, ...logs]); setForm({ date:new Date().toISOString().slice(0,10), machineCode:'', action:'', technician:'', status:'Selesai', cost:0, note:'' }); };
+	const add = async ()=>{ if(!form.machineCode || !form.action) return; const next:Maintenance = { id: crypto.randomUUID(), ...form }; await save([next, ...logs]); setForm({ date:new Date().toISOString().slice(0,10), machineCode:'', action:'', technician:'', status:'Selesai', cost:0, note:'' }); };
 
 	const filtered = useMemo(()=> logs.filter(l => l.date.startsWith(month) && (status==='ALL' || l.status===status) && [l.machineCode,l.action,l.technician,l.note||''].join(' ').toLowerCase().includes(search.toLowerCase())), [logs, month, status, search]);
 	const totals = useMemo(()=> filtered.reduce((a,l)=> a + l.cost, 0), [filtered]);

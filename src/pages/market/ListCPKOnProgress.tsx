@@ -2,7 +2,7 @@ import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, Tabl
 import PrintIcon from '@mui/icons-material/Print';
 import { useEffect, useRef, useState } from 'react';
 import Api from '../../lib/api';
-import { runAllMigrationsOnce } from '../../lib/migrations';
+import kvStore from '../../lib/kvStore';
 import TableExportToolbar from '../../components/TableExportToolbar';
 
 type SPKRow = {
@@ -92,8 +92,7 @@ export default function ListCPKOnProgress() {
 
     // Live load from backend (pipeline + rekap + plotting) with local fallback
     useEffect(() => {
-        // Run localStorage migrations once to normalize legacy data
-        try { runAllMigrationsOnce(); } catch { }
+    // Migrations disabled: kvStore is the single source of truth
         const refresh = async () => {
             try {
                 let queue: any[] = [];
@@ -101,12 +100,12 @@ export default function ListCPKOnProgress() {
                 let rbList: any[] = [];
                 let adList: any[] = [];
                 try {
-                    const [pApi, rbApi, qApi, dApi] = await Promise.all([
-                        Api.getPipeline(),
-                        Api.getRekapBordir(),
-                        Api.getPlottingQueue(),
-                        Api.getDesignQueue(),
-                    ]);
+                            const [pApi, rbApi, qApi, dApi] = await Promise.all([
+                                Api.getPipeline(),
+                                Api.getRekapBordir(),
+                                Api.getPlottingQueue(),
+                                Api.getDesignQueue(),
+                            ]);
                     // Map API payloads to local shapes
                     const pipelineApi = Array.isArray(pApi) ? pApi.map((x) => ({
                         idSpk: x.id_spk,
@@ -152,14 +151,10 @@ export default function ListCPKOnProgress() {
                     const pipeKey = 'spk_pipeline';
                     const rbKey = 'method_rekap_bordir';
                     const adKey = 'antrian_input_desain';
-                    const qRawLocal = localStorage.getItem(qKey);
-                    const pRawLocal = localStorage.getItem(pipeKey);
-                    const rbRawLocal = localStorage.getItem(rbKey);
-                    const adRawLocal = localStorage.getItem(adKey);
-                    const queueLocal: any[] = qRawLocal ? JSON.parse(qRawLocal) : [];
-                    const pipelineLocal: any[] = pRawLocal ? JSON.parse(pRawLocal) : [];
-                    const rbLocal: any[] = rbRawLocal ? JSON.parse(rbRawLocal) : [];
-                    const adLocal: any[] = adRawLocal ? JSON.parse(adRawLocal) : [];
+                    const queueLocal: any[] = (await kvStore.get(qKey)) || [];
+                    const pipelineLocal: any[] = (await kvStore.get(pipeKey)) || [];
+                    const rbLocal: any[] = (await kvStore.get(rbKey)) || [];
+                    const adLocal: any[] = (await kvStore.get(adKey)) || [];
 
                     const unionByIdSpk = (a: any[], b: any[]) => {
                         const out: any[] = [];
@@ -193,21 +188,15 @@ export default function ListCPKOnProgress() {
                     const pipeKey = 'spk_pipeline';
                     const rbKey = 'method_rekap_bordir';
                     const adKey = 'antrian_input_desain';
-                    const qRaw = localStorage.getItem(qKey);
-                    queue = qRaw ? JSON.parse(qRaw) : [];
-                    const pRaw = localStorage.getItem(pipeKey);
-                    pipeline = pRaw ? JSON.parse(pRaw) : [];
-                    const rbRaw = localStorage.getItem(rbKey);
-                    rbList = rbRaw ? JSON.parse(rbRaw) : [];
-                    const adRaw = localStorage.getItem(adKey);
-                    adList = adRaw ? JSON.parse(adRaw) : [];
+                    queue = (await kvStore.get(qKey)) || [];
+                    pipeline = (await kvStore.get(pipeKey)) || [];
+                    rbList = (await kvStore.get(rbKey)) || [];
+                    adList = (await kvStore.get(adKey)) || [];
                 }
 
                 // Load auxiliary sources to mirror PrintSPK data sourcing
-                const keranjangRaw = localStorage.getItem('keranjang');
-                const keranjangList: any[] = keranjangRaw ? JSON.parse(keranjangRaw) : [];
-                const spkOrdersRaw = localStorage.getItem('spk_orders');
-                const spkOrdersMap: Record<string, any> = spkOrdersRaw ? JSON.parse(spkOrdersRaw) : {};
+                const keranjangList: any[] = (await kvStore.get('keranjang')) || [];
+                const spkOrdersMap: Record<string, any> = (await kvStore.get('spk_orders')) || {};
 
                 const rekapDate = new Map<string, string>(); // idSpk -> createdAt
                 rbList.forEach((rb) => {
@@ -247,10 +236,10 @@ export default function ListCPKOnProgress() {
                 };
 
                 // Load production recap mapping to show 7-digit ID like in Method page
-                const prRaw = localStorage.getItem('production_recap_map');
-                const prMap: Record<string, any> = prRaw ? JSON.parse(prRaw) : {};
-                const terbitRaw = localStorage.getItem('spk_terbit_map');
-                const terbitMap: Record<string, string> = terbitRaw ? JSON.parse(terbitRaw) : {};
+                const prRaw = (await kvStore.get('production_recap_map')) || {};
+                const prMap: Record<string, any> = prRaw && typeof prRaw === 'object' ? prRaw : {};
+                const terbitRaw = (await kvStore.get('spk_terbit_map')) || {};
+                const terbitMap: Record<string, string> = terbitRaw && typeof terbitRaw === 'object' ? terbitRaw : {};
                 const format7 = (v: any) => {
                     const m = String(v || '').match(/(\d{1,})/);
                     return m ? String(Number(m[1])).padStart(7, '0') : '';
@@ -325,21 +314,19 @@ export default function ListCPKOnProgress() {
                 setRows([]);
             }
         };
-        const onStorage = (e: StorageEvent) => {
-            if ([
-                'plotting_rekap_bordir_queue',
-                'spk_pipeline',
-                'method_rekap_bordir',
-                'antrian_input_desain',
-                'spk_orders',
-                'keranjang',
-                'spk_terbit_map'
-            ].includes(e.key || '')) refresh();
-        };
+        const keysToWatch = [
+            'plotting_rekap_bordir_queue',
+            'spk_pipeline',
+            'method_rekap_bordir',
+            'antrian_input_desain',
+            'spk_orders',
+            'keranjang',
+            'spk_terbit_map'
+        ];
+        const subs = keysToWatch.map((k) => kvStore.subscribe(k, () => { try { refresh(); } catch {} }));
         refresh();
-        window.addEventListener('storage', onStorage);
         const timer = setInterval(refresh, 2000);
-        return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+        return () => { try { subs.forEach(s => s.unsubscribe()); } catch {} ; clearInterval(timer); };
     }, []);
 
     const [search, setSearch] = useState("");

@@ -4,6 +4,7 @@ import TableExportToolbar from '../../../../components/TableExportToolbar'
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
+import kvStore from '../../../../lib/kvStore';
 
 interface Asset {
   file: string | null // Data URL for the file
@@ -38,61 +39,56 @@ export default function DetailTambahan() {
 
   // Load and persist tambahan form so it survives navigation and can be used by Print SPK
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('inputTambahanForm');
-      if (raw) {
-        const d = JSON.parse(raw);
-        setBottomStrap(d.bottomStrap || '');
-        setArmStrap(d.armStrap || '');
-        setBottomTire(d.bottomTire || '');
-        setSkoder(d.skoder || '');
-        setPocketVariant(d.pocketVariant || '');
-        setReflector(d.reflector || '');
-        setColorReflector(d.colorReflector || '');
-        setVentilation(d.ventilation || '');
-        setJahitanVentilasiHorz(d.jahitanVentilasiHorz || '');
-        setPenHolder(d.penHolder || '');
-        setCatTongue(d.catTongue || '');
-        setLanyardHolder(d.lanyardHolder || '');
-        setHTHanger(d.HThanger || '');
-      }
-    } catch { }
-    // Fetch dropdown enums for tambahan fields
-    // (async () => {
-    //   try {
-    //     const optList = await fetch('/api/dropdown/options').then(r => r.json()).catch(() => []);
-    //     const byKey: Record<string, Array<{ value: string; label: string }>> = {};
-    //     (optList || []).forEach((o: any) => {
-    //       if (!o?.attribute || o.is_active === false) return;
-    //       const arr = byKey[o.attribute] || [];
-    //       arr.push({ value: o.value, label: o.label || o.value });
-    //       byKey[o.attribute] = arr;
-    //     });
-    //     setOptions(byKey);
-    //   } catch { setOptions({}); }
-    // })();
+    let mounted = true;
+    (async () => {
+      try {
+        const raw = await kvStore.get('inputTambahanForm');
+        const d = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : null);
+        if (!d) throw new Error('no-kv');
+        if (mounted) {
+          setBottomStrap(d.bottomStrap || '');
+          setArmStrap(d.armStrap || '');
+          setBottomTire(d.bottomTire || '');
+          setSkoder(d.skoder || '');
+          setPocketVariant(d.pocketVariant || '');
+          setReflector(d.reflector || '');
+          setColorReflector(d.colorReflector || '');
+          setVentilation(d.ventilation || '');
+          setJahitanVentilasiHorz(d.jahitanVentilasiHorz || '');
+          setPenHolder(d.penHolder || '');
+          setCatTongue(d.catTongue || '');
+          setLanyardHolder(d.lanyardHolder || '');
+          setHTHanger(d.HThanger || '');
+        }
+      } catch {}
+    })();
+    return () => { mounted = false; };
   }, []);
+    // (dropdown enums loading removed — kept options placeholder)
 
   useEffect(() => {
-    try {
-      const data = {
-        bottomStrap, armStrap, bottomTire, skoder, pocketVariant, reflector, colorReflector, ventilation, jahitanVentilasiHorz, penHolder, catTongue, lanyardHolder, HThanger,
-        // Store labels for printing
-        bottomStrapLabel: (options['tali_bawah'] || []).find(o => o.value === bottomStrap)?.label || bottomStrap,
-        armStrapLabel: (options['tali_lengan'] || []).find(o => o.value === armStrap)?.label || armStrap,
-        bottomTireLabel: (options['ban_bawah'] || []).find(o => o.value === bottomTire)?.label || bottomTire,
-        skoderLabel: (options['skoder'] || []).find(o => o.value === skoder)?.label || skoder,
-        pocketVariantLabel: (options['varian_saku'] || []).find(o => o.value === pocketVariant)?.label || pocketVariant,
-        reflectorLabel: reflector,
-        colorReflectorLabel: (options['warna_list_reflektor'] || []).find(o => o.value === colorReflector)?.label || colorReflector,
-        ventilationLabel: (options['ventilasi'] || []).find(o => o.value === ventilation)?.label || ventilation,
-        penHolderLabel: (options['tempat_pulpen'] || []).find(o => o.value === penHolder)?.label || penHolder,
-        catTongueLabel: (options['lidah_kucing'] || []).find(o => o.value === catTongue)?.label || catTongue,
-        lanyardHolderLabel: (options['tempat_lanyard'] || []).find(o => o.value === lanyardHolder)?.label || lanyardHolder,
-        HThangerLabel: (options['gantungan_ht'] || []).find(o => o.value === HThanger)?.label || HThanger,
-      };
-      localStorage.setItem('inputTambahanForm', JSON.stringify(data));
-    } catch { }
+    const save = async () => {
+      try {
+        const data = {
+          bottomStrap, armStrap, bottomTire, skoder, pocketVariant, reflector, colorReflector, ventilation, jahitanVentilasiHorz, penHolder, catTongue, lanyardHolder, HThanger,
+          // Store labels for printing
+          bottomStrapLabel: (options['tali_bawah'] || []).find(o => o.value === bottomStrap)?.label || bottomStrap,
+          armStrapLabel: (options['tali_lengan'] || []).find(o => o.value === armStrap)?.label || armStrap,
+          bottomTireLabel: (options['ban_bawah'] || []).find(o => o.value === bottomTire)?.label || bottomTire,
+          skoderLabel: (options['skoder'] || []).find(o => o.value === skoder)?.label || skoder,
+          pocketVariantLabel: (options['varian_saku'] || []).find(o => o.value === pocketVariant)?.label || pocketVariant,
+          reflectorLabel: reflector,
+          colorReflectorLabel: (options['warna_list_reflektor'] || []).find(o => o.value === colorReflector)?.label || colorReflector,
+          ventilationLabel: (options['ventilasi'] || []).find(o => o.value === ventilation)?.label || ventilation,
+          penHolderLabel: (options['tempat_pulpen'] || []).find(o => o.value === penHolder)?.label || penHolder,
+          catTongueLabel: (options['lidah_kucing'] || []).find(o => o.value === catTongue)?.label || catTongue,
+          lanyardHolderLabel: (options['tempat_lanyard'] || []).find(o => o.value === lanyardHolder)?.label || lanyardHolder,
+          HThangerLabel: (options['gantungan_ht'] || []).find(o => o.value === HThanger)?.label || HThanger,
+        };
+        await kvStore.set('inputTambahanForm', data);
+      } catch {}
+    };
+    save();
   }, [bottomStrap, armStrap, bottomTire, skoder, pocketVariant, reflector, colorReflector, ventilation, penHolder, catTongue, lanyardHolder, HThanger, jahitanVentilasiHorz, options]);
 
   // Modal state
@@ -170,47 +166,61 @@ export default function DetailTambahan() {
     }
   };
 
-  // Finalize Input Desain -> push to design queue (localStorage)
-  const handleSubmitToQueue = () => {
+  // Finalize Input Desain -> push to design queue (kvStore first, localStorage fallback)
+  const handleSubmitToQueue = async () => {
     try {
-      const formRaw = localStorage.getItem('inputDetailForm');
-      const form = formRaw ? JSON.parse(formRaw) : {};
-      // Ambil konteks SPK untuk melekatkan idSpk dan quantity ke design_queue
-      const spkRawCtx = localStorage.getItem('current_spk_context');
-      const spkCtx = spkRawCtx ? JSON.parse(spkRawCtx) : null;
+      // Load working form from kvStore
+      let form: any = {};
+      try {
+        const raw = await kvStore.get('inputDetailForm');
+        form = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {});
+      } catch {}
+
+      // Load SPK context
+      let spkCtx: any = null;
+  try { const r = await kvStore.get('current_spk_context'); spkCtx = r && typeof r === 'object' ? r : (r ? JSON.parse(String(r)) : null); } catch {}
+
       const sanitizeQty = (val: any): string => {
         const n = Number(String(val ?? '').toString().replace(/[^\d-]/g, ''));
         return !isNaN(n) && n > 0 ? String(n) : '0';
       };
-      // Helpers: generator 7-digit numeric IDs
-      const nextCustomId = (): string => {
+
+      // Helpers that persist counters into kvStore only
+      const nextCustomId = async (): Promise<string> => {
         const key = 'custom_auto_seq';
-        let seq = parseInt(localStorage.getItem(key) || '5000000', 10);
-        if (!Number.isFinite(seq) || seq < 5000000) seq = 5000000;
-        seq += 1;
-        localStorage.setItem(key, String(seq));
-        return String(seq).padStart(7, '0');
+        try {
+          const raw = await kvStore.get(key);
+          let seq = Number.isFinite(Number(raw)) ? parseInt(String(raw), 10) : NaN;
+          if (!Number.isFinite(seq) || seq < 5000000) seq = 5000000;
+          seq += 1;
+          await kvStore.set(key, String(seq));
+          return String(seq).padStart(7, '0');
+        } catch { return String(5000001).padStart(7, '0'); }
       };
 
-      const nextRekapIdForToday = (): string => {
-        const today = new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+      const nextRekapIdForToday = async (): Promise<string> => {
+        const today = new Date().toISOString().slice(0, 10);
         const dateKey = 'rekap_auto_date';
         const idKey = 'rekap_auto_id';
         const seqKey = 'rekap_auto_seq';
-        const curDate = localStorage.getItem(dateKey) || '';
-        if (curDate === today) {
-          const existing = localStorage.getItem(idKey);
-          if (existing && /^\d{7}$/.test(existing)) return existing;
-        }
-        let seq = parseInt(localStorage.getItem(seqKey) || '9000000', 10);
-        if (!Number.isFinite(seq) || seq < 9000000) seq = 9000000;
-        seq += 1;
-        const id = String(seq).padStart(7, '0');
-        localStorage.setItem(seqKey, String(seq));
-        localStorage.setItem(dateKey, today);
-        localStorage.setItem(idKey, id);
-        return id;
+        try {
+          const curDate = (await kvStore.get(dateKey)) || '';
+          if (curDate === today) {
+            const existing = await kvStore.get(idKey);
+            if (existing && /^\d{7}$/.test(String(existing))) return String(existing);
+          }
+          const rawSeq = await kvStore.get(seqKey);
+          let seq = Number.isFinite(Number(rawSeq)) ? parseInt(String(rawSeq), 10) : 9000000;
+          if (!Number.isFinite(seq) || seq < 9000000) seq = 9000000;
+          seq += 1;
+          const id = String(seq).padStart(7, '0');
+          await kvStore.set(seqKey, String(seq));
+          await kvStore.set(dateKey, today);
+          await kvStore.set(idKey, id);
+          return id;
+        } catch { return String(9000001).padStart(7, '0'); }
       };
+
       const spkId = spkCtx?.idSpk || '';
       if (!spkId) {
         alert('ID SPK tidak ditemukan. Silakan pilih pesanan dari Antrian Input Desain terlebih dahulu.');
@@ -218,8 +228,8 @@ export default function DetailTambahan() {
       }
       const spkQty = sanitizeQty(spkCtx?.quantity);
       // Generate IDs as requested
-      const idRekapCustom = nextRekapIdForToday(); // 7-digit, start 9000001, one per day
-      const idCustom = nextCustomId(); // 7-digit, start 5000001
+      const idRekapCustom = await nextRekapIdForToday(); // 7-digit, start 9000001, one per day
+      const idCustom = await nextCustomId(); // 7-digit, start 5000001
       const item = {
         queueId: (crypto as any)?.randomUUID ? (crypto as any).randomUUID() : `${Date.now()}-${Math.random()}`,
         idRekapCustom,
@@ -236,79 +246,78 @@ export default function DetailTambahan() {
         assets: assets.map(a => ({ file: a.file, attribute: a.attribute, size: a.size, distance: a.distance, description: a.description })),
         status: 'Menunggu dikerjakan'
       };
-      const key = 'design_queue';
-      const raw = localStorage.getItem(key);
-      const list = raw ? JSON.parse(raw) : [];
-      list.push(item);
-      localStorage.setItem(key, JSON.stringify(list));
+
+      // push into design_queue (kvStore only)
+      try {
+        const rawQueue = await kvStore.get('design_queue') || [];
+        const list = Array.isArray(rawQueue) ? rawQueue : (typeof rawQueue === 'string' ? JSON.parse(rawQueue) : []);
+        list.push(item);
+        await kvStore.set('design_queue', list);
+      } catch {}
+
       // Snapshot order and design details keyed by idSpk for Print SPK usage
       try {
         // 1) Persist original order (from antrian_input_desain)
-        const qKey = 'antrian_input_desain';
-        const qRaw2 = localStorage.getItem(qKey);
-        const qList2 = qRaw2 ? JSON.parse(qRaw2) : [];
-        const original = qList2.find((q: any) => String(q?.idSpk || '') === String(spkId));
-        const orderMapKey = 'spk_orders';
-        const orderMapRaw = localStorage.getItem(orderMapKey);
-        const orderMap = orderMapRaw ? JSON.parse(orderMapRaw) : {};
-        if (original) {
-          orderMap[String(spkId)] = original;
-          localStorage.setItem(orderMapKey, JSON.stringify(orderMap));
-        }
+        try {
+          const qRaw2 = await kvStore.get('antrian_input_desain') || [];
+          const qList2 = Array.isArray(qRaw2) ? qRaw2 : (typeof qRaw2 === 'string' ? JSON.parse(qRaw2) : []);
+          const original = qList2.find((q: any) => String(q?.idSpk || '') === String(spkId));
+          if (original) {
+            const orderRaw = await kvStore.get('spk_orders') || {};
+            const orderMap = orderRaw && typeof orderRaw === 'object' ? (orderRaw as any) : (typeof orderRaw === 'string' ? JSON.parse(orderRaw as any) : {});
+            (orderMap as any)[String(spkId)] = original;
+            await kvStore.set('spk_orders', orderMap);
+          }
+        } catch {}
+
         // 2) Persist design form snapshot keyed by idSpk
-        const designMapKey = 'spk_design';
-        const designMapRaw = localStorage.getItem(designMapKey);
-        const designMap = designMapRaw ? JSON.parse(designMapRaw) : {};
-        // merge product form, tambahan form and core form into a single snapshot for Print SPK
-        const produkForm = JSON.parse(localStorage.getItem('inputProdukForm') || '{}');
-        const tambahanForm = JSON.parse(localStorage.getItem('inputTambahanForm') || '{}');
-        designMap[String(spkId)] = { ...form, ...produkForm, ...tambahanForm, assets, assetLink, catatan };
-        localStorage.setItem(designMapKey, JSON.stringify(designMap));
+        try {
+          const designRaw = await kvStore.get('spk_design') || {};
+          const designMap = designRaw && typeof designRaw === 'object' ? designRaw : (typeof designRaw === 'string' ? JSON.parse(designRaw) : {});
+          let produkForm: any = {};
+          try { const pf = await kvStore.get('inputProdukForm'); produkForm = pf && typeof pf === 'object' ? pf : (pf ? JSON.parse(String(pf)) : {}); } catch { produkForm = {}; }
+          let tambahanForm: any = {};
+          try { const tf = await kvStore.get('inputTambahanForm'); tambahanForm = tf && typeof tf === 'object' ? tf : (tf ? JSON.parse(String(tf)) : {}); } catch { tambahanForm = {}; }
+          (designMap as any)[String(spkId)] = { ...form, ...produkForm, ...tambahanForm, assets, assetLink, catatan };
+          await kvStore.set('spk_design', designMap);
+        } catch {}
       } catch { }
-      // Remove this SPK from Antrian Input Desain and trigger refresh via storage event
+
+      // Remove this SPK from Antrian Input Desain
       try {
-        const qKey = 'antrian_input_desain';
-        const qRaw = localStorage.getItem(qKey);
-        const qList = qRaw ? JSON.parse(qRaw) : [];
+        const qRaw = await kvStore.get('antrian_input_desain') || [];
+        const qList = Array.isArray(qRaw) ? qRaw : (typeof qRaw === 'string' ? JSON.parse(qRaw) : []);
         const filtered = qList.filter((q: any) => String(q?.idSpk || '') !== String(spkId));
-        localStorage.setItem(qKey, JSON.stringify(filtered));
-      } catch { }
+        await kvStore.set('antrian_input_desain', filtered);
+      } catch {}
+
       // Clear current context to avoid accidental reuse
-      try { localStorage.removeItem('current_spk_context'); } catch { }
-      // Tambahkan ke database_trend (via Input Desain) dengan quantity dari SPK terkait
+  try { await kvStore.set('current_spk_context', null); } catch {}
+
+      // Tambahkan ke database_trend (via Input Desain) with quantity from SPK
       try {
-        const trendKey = 'database_trend';
-        const trendRaw = localStorage.getItem(trendKey);
-        const trendList: Array<{ jenis_produk: string; jenis_pola: string; quantity: string; updatedAt: string; idSpk?: string }> = trendRaw ? JSON.parse(trendRaw) : [];
+  let trendList: any[] = [];
+  try { const tr = await kvStore.get('database_trend'); trendList = Array.isArray(tr) ? tr : (tr ? JSON.parse(String(tr)) : []); } catch { trendList = []; }
         const today = new Date().toISOString().slice(0, 10);
         const jenisProduk = form.product || '-';
         const jenisPola = form.pattern || '-';
-        // Ambil quantity dari SPK context yang diset saat klik Input Desain pada Antrian
-        const spkRaw = localStorage.getItem('current_spk_context');
-        const spk = spkRaw ? JSON.parse(spkRaw) : null;
-        // Helper: sanitize a quantity-like value into a positive integer (as string)
-        const sanitizeQty = (val: any): string => {
-          const n = Number(String(val ?? '').toString().replace(/[^\d-]/g, ''));
-          return !isNaN(n) && n > 0 ? String(n) : '';
-        };
-        // 1) Try quantity from current_spk_context
-        let qtyStr = sanitizeQty(spk?.quantity);
-        // 2) If missing, try to find the SPK in antrian_input_desain by id and read its quantity
+        // Determine quantity from SPK context or queue
+        const sanitizeQty2 = (val: any): string => { const n = Number(String(val ?? '').toString().replace(/[^\d-]/g, '')); return !isNaN(n) && n > 0 ? String(n) : ''; };
+        let qtyStr = sanitizeQty2(spkCtx?.quantity);
         if (!qtyStr) {
           try {
-            const queueRaw = localStorage.getItem('antrian_input_desain');
-            const queue = queueRaw ? JSON.parse(queueRaw) : [];
-            const found = spk?.idSpk ? queue.find((q: any) => q?.idSpk === spk.idSpk) : null;
-            qtyStr = sanitizeQty(found?.quantity);
-            // 3) As a last resort, use items length if available
-            if (!qtyStr && found?.items) qtyStr = sanitizeQty(found.items.length);
-          } catch { }
+            const queueRaw = await kvStore.get('antrian_input_desain') || [];
+            const queue = Array.isArray(queueRaw) ? queueRaw : (typeof queueRaw === 'string' ? JSON.parse(queueRaw) : []);
+            const found = spkCtx?.idSpk ? queue.find((q: any) => q?.idSpk === spkCtx.idSpk) : null;
+            qtyStr = sanitizeQty2(found?.quantity);
+            if (!qtyStr && found?.items) qtyStr = sanitizeQty2(found.items.length);
+          } catch {}
         }
-        // Final fallback
         if (!qtyStr) qtyStr = '0';
-        trendList.push({ jenis_produk: jenisProduk, jenis_pola: jenisPola, quantity: qtyStr, updatedAt: today, idSpk: spk?.idSpk });
-        localStorage.setItem(trendKey, JSON.stringify(trendList));
+        trendList.push({ jenis_produk: jenisProduk, jenis_pola: jenisPola, quantity: qtyStr, updatedAt: today, idSpk: spkCtx?.idSpk });
+  try { await kvStore.set('database_trend', trendList); } catch {}
       } catch { }
+
       setSnack({ open: true, message: `Input desain tersimpan (Rekap: ${idRekapCustom}). Mengarahkan ke Antrian Input Desain…`, severity: 'success' });
       // Optionally clear draft form // localStorage.removeItem('inputDetailForm');
       setTimeout(() => navigate('/market/input-desain/antrian-input'), 600);

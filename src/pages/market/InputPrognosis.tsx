@@ -1,5 +1,6 @@
 import { Box, TextField, Typography, Select, MenuItem, Button, Snackbar, Alert, RadioGroup, FormControlLabel, Radio, Grid } from '@mui/material';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import kvStore from '../../lib/kvStore';
 
 /**
  * Input Prognosis
@@ -15,7 +16,18 @@ export default function InputPrognosis() {
   const [source, setSource] = useState('');
   const [produk, setProduk] = useState('');
   const [snack, setSnack] = useState<{open:boolean;message:string;severity:'success'|'error'|'info'}>({open:false,message:'',severity:'success'});
-  const csName = (typeof window !== 'undefined' ? localStorage.getItem('current_cs') : '') || '-';
+  const [csName, setCsName] = useState<string>('-');
+
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const v = await kvStore.get('current_cs');
+        if (mounted && v) setCsName(String(v));
+      } catch {}
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   const resetForm = () => {
     setNama('');
@@ -26,15 +38,15 @@ export default function InputPrognosis() {
   setProduk('');
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if(!nama || !hp || !tanggalChat || !waktu || !source){
       setSnack({open:true,message:'Lengkapi semua field',severity:'error'});
       return;
     }
     try {
       const key = 'database_prognosis';
-      const raw = localStorage.getItem(key);
-      const list: any[] = raw ? JSON.parse(raw) : [];
+      let list: any[] = [];
+      try { const raw = await kvStore.get(key); list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch {}
       const now = new Date().toISOString();
       const payload = {
         id: `PROG-${Date.now()}`,
@@ -49,7 +61,7 @@ export default function InputPrognosis() {
         updatedAt: now,
       };
       list.push(payload);
-      localStorage.setItem(key, JSON.stringify(list));
+      try { await kvStore.set(key, list); } catch {}
       setSnack({open:true,message:'Prognosis tersimpan',severity:'success'});
       resetForm();
     } catch (e) {

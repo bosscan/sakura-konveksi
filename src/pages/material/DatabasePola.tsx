@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, IconButton, Dialog, DialogTitle, DialogContent, DialogActions, Stack } from '@mui/material';
 import { useRef } from 'react';
 import TableExportToolbar from '../../components/TableExportToolbar';
@@ -8,20 +8,27 @@ import EditIcon from '@mui/icons-material/Edit';
 
 type Pattern = { id: string; code: string; name: string; product: string; size: string; note?: string };
 const STORAGE_KEY = 'db_pola_master';
+import kvStore from '../../lib/kvStore';
 
 export default function DatabasePola() {
   const tableRef = useRef<HTMLTableElement | null>(null);
-  const [items, setItems] = useState<Pattern[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+  const [items, setItems] = useState<Pattern[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setItems(list as Pattern[]); } catch { if (mounted) setItems([]); } })();
+    const sub = kvStore.subscribe(STORAGE_KEY, (v)=>{ try { if (Array.isArray(v)) setItems(v as Pattern[]); } catch {} });
+    return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+  }, []);
   const [search, setSearch] = useState('');
   const [form, setForm] = useState<Omit<Pattern,'id'>>({ code:'', name:'', product:'', size:'', note:'' });
   const [editing, setEditing] = useState<Pattern | null>(null);
 
   const filtered = useMemo(() => items.filter(i => [i.code,i.name,i.product,i.size].join(' ').toLowerCase().includes(search.toLowerCase())), [items, search]);
-  const saveItems = (list: Pattern[]) => { setItems(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
+  const saveItems = async (list: Pattern[]) => { setItems(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
   const handleChange = (k: keyof typeof form, v:any) => setForm(f=>({...f,[k]:v}));
-  const addItem = () => { if(!form.code || !form.name) return; const next: Pattern = { id: crypto.randomUUID(), ...form }; saveItems([next, ...items]); setForm({ code:'', name:'', product:'', size:'', note:'' }); };
-  const removeItem = (id:string)=> saveItems(items.filter(i=>i.id!==id));
-  const commitEdit = () => { if(!editing) return; const updated = items.map(i=> i.id===editing.id ? editing : i); saveItems(updated); setEditing(null); };
+  const addItem = async () => { if(!form.code || !form.name) return; const next: Pattern = { id: crypto.randomUUID(), ...form }; await saveItems([next, ...items]); setForm({ code:'', name:'', product:'', size:'', note:'' }); };
+  const removeItem = async (id:string)=> { await saveItems(items.filter(i=>i.id!==id)); };
+  const commitEdit = async () => { if(!editing) return; const updated = items.map(i=> i.id===editing.id ? editing : i); await saveItems(updated); setEditing(null); };
 
   return (
     <Box sx={{ p:3 }}>

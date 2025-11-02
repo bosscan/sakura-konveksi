@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, Stack, TextField, MenuItem, TableContainer, Table, TableHead, TableRow, TableCell, TableBody, Button } from '@mui/material';
 import { useRef } from 'react';
 import TableExportToolbar from '../../components/TableExportToolbar';
@@ -7,11 +7,18 @@ type MasterItem = { id: string; code: string; name: string; category: string; un
 type Consumption = { id: string; itemCode: string; qty: number; price: number };
 
 const MASTER_KEY = 'db_logistik_master';
+import kvStore from '../../lib/kvStore';
 const PRICE_SOURCES = ['Rata2 Input', 'Manual'] as const;
 
 export default function HppLogistikPola() {
   const tableRef = useRef<HTMLTableElement | null>(null);
-  const masters: MasterItem[] = useMemo(()=>{ try { const raw = localStorage.getItem(MASTER_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }, []);
+  const [masters, setMasters] = useState<MasterItem[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => { try { const raw = await kvStore.get(MASTER_KEY); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setMasters(list as MasterItem[]); } catch { if (mounted) setMasters([]); } })();
+    const sub = kvStore.subscribe(MASTER_KEY, (v)=>{ try { if (Array.isArray(v)) setMasters(v as MasterItem[]); } catch {} });
+    return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+  }, []);
   const [priceSource, setPriceSource] = useState<(typeof PRICE_SOURCES)[number]>('Manual');
   const [cons, setCons] = useState<Consumption[]>([]);
   const [form, setForm] = useState<{ itemCode: string; qty: number; price: number }>({ itemCode:'', qty:1, price:0 });

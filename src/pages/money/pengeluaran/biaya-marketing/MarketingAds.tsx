@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Box, Typography, Grid, TextField, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody } from '@mui/material';
 import { ResponsiveContainer, ComposedChart, Bar as RBar, Line as RLine, XAxis as RXAxis, YAxis as RYAxis, CartesianGrid, Tooltip as RTooltip, Legend as RLegend } from 'recharts';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type Ads = { id: string; date: string; channel: string; campaign: string; spend: number; note?: string; };
 const STORAGE_KEY = 'pengeluaran_marketing_ads';
@@ -13,13 +14,29 @@ const MarketingAds: React.FC = () => {
   const [form, setForm] = useState<Ads>({ id: '', date: new Date().toISOString().slice(0,10), channel: '', campaign: '', spend: 0, note: '' });
   const [items, setItems] = useState<Ads[]>([]);
   const tableRef = useRef<HTMLTableElement | null>(null);
-  const [budget, setBudget] = useState<number>(() => {
-    try { return Number(localStorage.getItem(SETTINGS_KEY) || 0); } catch { return 0; }
-  });
+  const [budget, setBudget] = useState<number>(0);
 
-  useEffect(() => { try { const raw = localStorage.getItem(STORAGE_KEY); if (raw) setItems(JSON.parse(raw)); } catch {} }, []);
-  useEffect(() => { localStorage.setItem(STORAGE_KEY, JSON.stringify(items)); }, [items]);
-  useEffect(() => { localStorage.setItem(SETTINGS_KEY, String(budget || 0)); }, [budget]);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const [rawItems, rawBudget] = await Promise.all([kvStore.get(STORAGE_KEY), kvStore.get(SETTINGS_KEY)]);
+        if (!mounted) return;
+        try { const list = Array.isArray(rawItems) ? (rawItems as Ads[]) : (rawItems ? JSON.parse(String(rawItems)) : []); setItems(list); } catch { setItems([]); }
+        try { setBudget(Number(rawBudget ?? 0)); } catch { setBudget(0); }
+      } catch { if (mounted) { setItems([]); setBudget(0); } }
+    };
+    (async () => {
+      await refresh();
+      const subs: Array<{ unsubscribe: () => void }> = [];
+      try { subs.push(kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} })); } catch {}
+      try { subs.push(kvStore.subscribe(SETTINGS_KEY, () => { try { refresh(); } catch {} })); } catch {}
+      return () => { subs.forEach(s => { try { s.unsubscribe(); } catch {} }); };
+    })();
+    return () => { mounted = false; };
+  }, []);
+  useEffect(() => { (async () => { try { await kvStore.set(STORAGE_KEY, items); } catch {} })(); }, [items]);
+  useEffect(() => { (async () => { try { await kvStore.set(SETTINGS_KEY, budget); } catch {} })(); }, [budget]);
 
   const filtered = useMemo(() => items.filter(i => i.date.startsWith(`${month}-`)), [items, month]);
   const totalSpend = useMemo(() => filtered.reduce((a,b) => a + b.spend, 0), [filtered]);

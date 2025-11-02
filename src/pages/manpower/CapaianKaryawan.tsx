@@ -1,19 +1,42 @@
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Paper, TextField, Button, TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import TableExportToolbar from '../../components/TableExportToolbar';
 import Grid from '@mui/material/GridLegacy';
+import kvStore from '../../lib/kvStore';
 
 type Output = { id: string; date: string; name: string; output: number; hours: number; note?: string };
 const STORAGE_KEY = 'mp_capaian';
 
 export default function CapaianKaryawan() {
-	const [rows, setRows] = useState<Output[]>(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } });
+	const [rows, setRows] = useState<Output[]>([]);
 	const [form, setForm] = useState<Omit<Output,'id'>>({ date:new Date().toISOString().slice(0,10), name:'', output:0, hours:0, note:'' });
 	const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
 	const [search, setSearch] = useState('');
 	const handleChange = (k:keyof typeof form, v:any)=> setForm(f=>({...f,[k]:v}));
-	const save = (list:Output[])=>{ setRows(list); localStorage.setItem(STORAGE_KEY, JSON.stringify(list)); };
-	const add = ()=>{ if(!form.name) return; const next:Output = { id: crypto.randomUUID(), ...form }; save([next, ...rows]); setForm({ date:new Date().toISOString().slice(0,10), name:'', output:0, hours:0, note:'' }); };
+
+	useEffect(() => {
+		let mounted = true;
+		(async () => {
+			try {
+				const raw = await kvStore.get(STORAGE_KEY);
+				if (!mounted) return;
+				setRows(Array.isArray(raw) ? raw as Output[] : []);
+			} catch {
+				if (mounted) setRows([]);
+			}
+			try {
+				const sub = kvStore.subscribe(STORAGE_KEY, (v) => {
+					setRows(Array.isArray(v) ? (v as Output[]) : []);
+				});
+				return () => { mounted = false; sub?.unsubscribe?.(); };
+			} catch {
+				return () => { mounted = false; };
+			}
+		})();
+	}, []);
+
+	const save = async (list:Output[])=>{ setRows(list); try { await kvStore.set(STORAGE_KEY, list); } catch {} };
+	const add = async ()=>{ if(!form.name) return; const next:Output = { id: crypto.randomUUID(), ...form }; await save([next, ...rows]); setForm({ date:new Date().toISOString().slice(0,10), name:'', output:0, hours:0, note:'' }); };
 	const filtered = useMemo(()=> rows.filter(r => r.date.startsWith(month) && [r.name,r.note||''].join(' ').toLowerCase().includes(search.toLowerCase())), [rows, month, search]);
 	const totals = useMemo(()=> filtered.reduce((acc,r)=>{ acc.output+=r.output; acc.hours+=r.hours; return acc; }, { output:0, hours:0 }), [filtered]);
 	const tableRef = useRef<HTMLTableElement | null>(null);

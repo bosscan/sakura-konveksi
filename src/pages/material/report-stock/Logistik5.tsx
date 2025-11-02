@@ -1,16 +1,23 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Box, Typography, Paper, Stack, TextField, TableContainer, Table, TableHead, TableRow, TableCell, TableBody } from '@mui/material';
 import { useRef } from 'react';
 import TableExportToolbar from '../../../components/TableExportToolbar';
 
 type StockItem = { id: string; date: string; code: string; name: string; category: string; unit: string; qtyIn: number; qtyOut: number; price: number; supplier: string; note: string; };
 const STORAGE_KEY = 'material_logistik5';
+import kvStore from '../../../lib/kvStore';
 
 export default function Logistik5() {
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
   const [search, setSearch] = useState<string>('');
-  const items: StockItem[] = useMemo(()=>{ try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }, []);
+  const [items, setItems] = useState<StockItem[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    (async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); if (mounted) setItems(list as StockItem[]); } catch { if (mounted) setItems([]); } })();
+    const sub = kvStore.subscribe(STORAGE_KEY, (v)=>{ try { if (Array.isArray(v)) setItems(v as StockItem[]); } catch {} });
+    return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+  }, []);
   const filtered = useMemo(()=> items.filter(it => it.date?.startsWith(month) && (it.code?.toLowerCase().includes(search.toLowerCase()) || it.name?.toLowerCase().includes(search.toLowerCase()))), [items, month, search]);
   const totals = useMemo(()=> filtered.reduce((acc, it)=>{ acc.in += it.qtyIn; acc.out += it.qtyOut; acc.value += (it.qtyIn - it.qtyOut) * it.price; return acc; }, { in:0, out:0, value:0 }), [filtered]);
 

@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
+import kvStore from '../../../../lib/kvStore';
 import { Box, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography } from '@mui/material';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
 
@@ -34,77 +35,85 @@ type RekapBordir = {
 export default function DivisionAntrianTable({ title, divisionKey }: { title: string; divisionKey: 'desain-produksi' | 'cutting-pola' | 'stock-bordir' | 'bordir' | 'setting' | 'stock-jahit' | 'jahit' | 'finishing' | 'foto-produk' | 'stock-no-transaksi' | 'pengiriman' }) {
   const tableRef = useRef<HTMLTableElement | null>(null);
   const [all, setAll] = useState<PipelineItem[]>([]);
+  const [rekapList, setRekapList] = useState<RekapBordir[]>([]);
+  const [antrianInput, setAntrianInput] = useState<any[]>([]);
+  const [spkOrders, setSpkOrders] = useState<Record<string, any>>({});
+  const [designSnap, setDesignSnap] = useState<Record<string, any>>({});
+  const [prodRecapMap, setProdRecapMap] = useState<Record<string, any>>({});
 
   // Load from pipeline store
   useEffect(() => {
-    const refresh = () => {
+    let mounted = true;
+    const refresh = async () => {
       try {
-        const raw = localStorage.getItem('spk_pipeline');
-        const list: PipelineItem[] = raw ? JSON.parse(raw) : [];
-  setAll(list);
-      } catch {
-  setAll([]);
-      }
+        const raw = await kvStore.get('spk_pipeline');
+        const list: PipelineItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setAll(list);
+      } catch { if (mounted) setAll([]); }
     };
     refresh();
-    const onStorage = (e: StorageEvent) => {
-      if (
-        e.key === 'spk_pipeline' ||
-        e.key === 'method_rekap_bordir' ||
-        e.key === 'antrian_input_desain'
-      )
-        refresh();
-    };
-    window.addEventListener('storage', onStorage);
-    const timer = setInterval(refresh, 2000);
-    return () => {
-      window.removeEventListener('storage', onStorage);
-      clearInterval(timer);
-    };
+    const unsub = kvStore.subscribe('spk_pipeline', () => { try { refresh(); } catch {} });
+    const timer = setInterval(refresh, 6000);
+    return () => { mounted = false; try { (unsub as any)?.unsubscribe?.(); } catch {} clearInterval(timer); };
   }, []);
 
-  // Helper: safe LS read
-  const loadLs = <T = any,>(key: string, def: T): T => {
-    try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : def; } catch { return def; }
-  };
+  // Load reference datasets used for enrichment
+  useEffect(() => {
+    let mounted = true;
+    const refreshRefs = async () => {
+      try {
+        const [r1, r2, r3, r4, r5] = await Promise.all([
+          kvStore.get('method_rekap_bordir').catch(() => null),
+          kvStore.get('antrian_input_desain').catch(() => null),
+          kvStore.get('spk_orders').catch(() => null),
+          kvStore.get('spk_design').catch(() => null),
+          kvStore.get('production_recap_map').catch(() => null),
+        ]);
+        if (mounted) {
+          setRekapList(Array.isArray(r1) ? r1 as any : (r1 ? JSON.parse(String(r1)) : []));
+          setAntrianInput(Array.isArray(r2) ? r2 as any[] : (r2 ? JSON.parse(String(r2)) : []));
+          setSpkOrders(r3 && typeof r3 === 'object' ? r3 as any : (r3 ? JSON.parse(String(r3)) : {}));
+          setDesignSnap(r4 && typeof r4 === 'object' ? r4 as any : (r4 ? JSON.parse(String(r4)) : {}));
+          setProdRecapMap(r5 && typeof r5 === 'object' ? r5 as any : (r5 ? JSON.parse(String(r5)) : {}));
+        }
+      } catch {}
+    };
+    refreshRefs();
+    const unsubs = [
+      kvStore.subscribe('method_rekap_bordir', () => refreshRefs()),
+      kvStore.subscribe('antrian_input_desain', () => refreshRefs()),
+      kvStore.subscribe('spk_orders', () => refreshRefs()),
+      kvStore.subscribe('spk_design', () => refreshRefs()),
+      kvStore.subscribe('production_recap_map', () => refreshRefs()),
+    ];
+    const timer = setInterval(refreshRefs, 10000);
+    return () => { mounted = false; unsubs.forEach(u => { try { (u as any)?.unsubscribe?.(); } catch {} }); clearInterval(timer); };
+  }, []);
 
   // Build helper maps for Rekap Bordir and SPK quantities
   const rekapBordirMap = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('method_rekap_bordir');
-      const list: RekapBordir[] = raw ? JSON.parse(raw) : [];
-      const map = new Map<string, string[]>(); // idSpk -> [rekapId]
-      list.forEach((rb) => {
-        (rb.items || []).forEach((it) => {
-          if (!it?.idSpk) return;
-          const arr = map.get(it.idSpk) || [];
-          if (!arr.includes(rb.rekapId)) arr.push(rb.rekapId);
-          map.set(it.idSpk, arr);
-        });
+    const map = new Map<string, string[]>();
+    (rekapList || []).forEach((rb) => {
+      (rb.items || []).forEach((it: any) => {
+        if (!it?.idSpk) return;
+        const arr = map.get(it.idSpk) || [];
+        if (!arr.includes(rb.rekapId)) arr.push(rb.rekapId);
+        map.set(it.idSpk, arr);
       });
-      return map;
-    } catch {
-      return new Map<string, string[]>();
-    }
-  }, [all]);
+    });
+    return map;
+  }, [rekapList]);
 
   // Lookup sources to enrich product/pattern/tanggal
   const antrianInputMap = useMemo(() => {
-    try {
-      const list: any[] = loadLs('antrian_input_desain', [] as any[]);
-      const map = new Map<string, any>();
-      list.forEach((it) => { if (it?.idSpk) map.set(String(it.idSpk), it); });
-      return map;
-    } catch { return new Map<string, any>(); }
-  }, [all]);
+    const map = new Map<string, any>();
+    (antrianInput || []).forEach((it) => { if (it?.idSpk) map.set(String(it.idSpk), it); });
+    return map;
+  }, [antrianInput]);
 
-  const spkOrdersMap = useMemo(() => {
-    return loadLs('spk_orders', {} as Record<string, any>) as Record<string, any>;
-  }, [all]);
+  const spkOrdersMap = spkOrders;
 
-  const designSnapMap = useMemo(() => {
-    return loadLs('spk_design', {} as Record<string, any>) as Record<string, any>;
-  }, [all]);
+  const designSnapMap = designSnap;
 
   const resolveJenisProduk = (row: PipelineItem): string => {
     const id = String(row.idSpk || '');
@@ -166,25 +175,20 @@ export default function DivisionAntrianTable({ title, divisionKey }: { title: st
   };
 
   const spkQtyMap = useMemo(() => {
-    // Build quantity map from antrian_input_desain
-    try {
-      const qRaw = localStorage.getItem('antrian_input_desain');
-      const qList: Array<{ idSpk: string; quantity?: any; items?: any[] }> = qRaw ? JSON.parse(qRaw) : [];
-      const map = new Map<string, number>();
-      const parseNum = (v: any): number => {
-        const n = Number(String(v ?? '').toString().replace(/[^\d-]/g, ''));
-        return !isNaN(n) && n > 0 ? n : 0;
-      };
-      qList.forEach((q) => {
-        if (!q?.idSpk) return;
-        const n = parseNum(q.quantity);
-        map.set(q.idSpk, n > 0 ? n : (q.items?.length || 0));
-      });
-      return map;
-    } catch {
-      return new Map<string, number>();
-    }
-  }, [all]);
+    // Build quantity map from kvStore-backed antrian_input_desain state
+    const qList: Array<{ idSpk: string; quantity?: any; items?: any[] }> = Array.isArray(antrianInput) ? antrianInput : [];
+    const map = new Map<string, number>();
+    const parseNum = (v: any): number => {
+      const n = Number(String(v ?? '').toString().replace(/[^\d-]/g, ''));
+      return !isNaN(n) && n > 0 ? n : 0;
+    };
+    qList.forEach((q) => {
+      if (!q?.idSpk) return;
+      const n = parseNum(q.quantity);
+      map.set(q.idSpk, n > 0 ? n : (q.items?.length || 0));
+    });
+    return map;
+  }, [antrianInput]);
 
   const parseQty = (row: PipelineItem): number => {
     if (typeof row.kuantity === 'number' && row.kuantity > 0) return row.kuantity;
@@ -200,18 +204,13 @@ export default function DivisionAntrianTable({ title, divisionKey }: { title: st
   };
 
   const deriveIdRp = (idSpk?: string): string => {
-    // Use production_recap_map mapping with strict 7-digit numeric format
     if (!idSpk) return '-';
-    try {
-      const raw = localStorage.getItem('production_recap_map');
-      const map = raw ? JSON.parse(raw) as Record<string, any> : {};
-      const v = map[idSpk];
-      if (v != null) {
-        const m = String(v).match(/(\d{1,})/);
-        const num = m ? Number(m[1]) : NaN;
-        if (!isNaN(num)) return String(num).padStart(7, '0');
-      }
-    } catch {}
+    const v = (prodRecapMap || {})[idSpk];
+    if (v != null) {
+      const m = String(v).match(/(\d{1,})/);
+      const num = m ? Number(m[1]) : NaN;
+      if (!isNaN(num)) return String(num).padStart(7, '0');
+    }
     return '-';
   };
 

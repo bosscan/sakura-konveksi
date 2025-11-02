@@ -4,10 +4,11 @@ import { Box, Chip, Dialog, DialogContent, DialogTitle, InputAdornment, MenuItem
 import SearchIcon from '@mui/icons-material/Search';
 import VisibilityIcon from '@mui/icons-material/Visibility';
 import TableExportToolbar from '../../components/TableExportToolbar';
+import kvStore from '../../lib/kvStore';
 
-// Small helper to read localStorage safely
-const loadLs = <T = any,>(key: string, def: T): T => {
-  try { const raw = localStorage.getItem(key); return raw ? JSON.parse(raw) as T : def; } catch { return def; }
+// Helper to read kvStore values as arrays/objects
+const readKv = async <T = any,>(key: string, def: T): Promise<T> => {
+  try { const raw = await kvStore.get(key); return (Array.isArray(def) ? (Array.isArray(raw) ? raw as any : (raw ? JSON.parse(String(raw)) : def)) : (raw && typeof raw === 'object' ? raw as any : (raw ? JSON.parse(String(raw)) : def))); } catch { return def; }
 };
 
 type AnyRec = Record<string, any>;
@@ -48,11 +49,11 @@ export default function DatabaseAssetDesainJadi() {
   const [attrFilter, setAttrFilter] = useState<AttrKey | ''>('');
   const [preview, setPreview] = useState<{ open: boolean; row?: GroupRow }>()
 
-  const makeGroups = (): GroupRow[] => {
-    // Sources
-    const dq: AnyRec[] = loadLs('design_queue', []);
-    const antri: AnyRec[] = loadLs('antrian_pengerjaan_desain', []);
-    const snapRaw: AnyRec = loadLs('spk_design', {});
+  const makeGroups = async (): Promise<GroupRow[]> => {
+    // Sources from kvStore
+    const dq: AnyRec[] = await readKv('design_queue', []);
+    const antri: AnyRec[] = await readKv('antrian_pengerjaan_desain', []);
+    const snapRaw: AnyRec = await readKv('spk_design', {});
     const snaps: AnyRec[] = Object.keys(snapRaw || {}).map((idSpk) => ({ idSpk, ...(snapRaw[idSpk] || {}) }));
     const order: Record<'antrian' | 'queue' | 'snapshot', number> = { antrian: 3, queue: 2, snapshot: 1 };
     const combine = (cur?: AssetBlock | null, next?: AssetBlock | null, prefer: number = 0, curPrefer: number = 0): { pick?: AssetBlock; prefer: number } => {
@@ -131,10 +132,24 @@ export default function DatabaseAssetDesainJadi() {
 
   const [rows, setRows] = useState<GroupRow[]>([]);
   useEffect(() => {
-    const refresh = () => setRows(makeGroups());
-    refresh();
-    const timer = setInterval(refresh, 1500);
-    return () => clearInterval(timer);
+    let mounted = true;
+    const refresh = async () => { try { const groups = await makeGroups(); if (mounted) setRows(groups); } catch {} };
+    (async () => {
+      await refresh();
+      try {
+        const subs = [
+          kvStore.subscribe('design_queue', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('antrian_pengerjaan_desain', () => { try { refresh(); } catch {} }),
+          kvStore.subscribe('spk_design', () => { try { refresh(); } catch {} }),
+        ];
+        const timer = setInterval(refresh, 3000);
+        return () => { try { subs.forEach(s=>s.unsubscribe()); } catch {}; clearInterval(timer); };
+      } catch {
+        const timer = setInterval(refresh, 2000);
+        return () => clearInterval(timer);
+      }
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const filtered = useMemo(() => {

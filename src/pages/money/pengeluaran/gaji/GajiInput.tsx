@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useState, useRef } from "react";
 import { Box, Typography, Grid, TextField, Button, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody } from '@mui/material';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type GajiEntry = {
   id: string;
@@ -34,15 +35,12 @@ const GajiInput: React.FC = () => {
   const tableRef = useRef<HTMLTableElement | null>(null);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      if (raw) setEntries(JSON.parse(raw));
-    } catch {}
+    let mounted = true;
+    const refresh = async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? (raw as GajiEntry[]) : (raw ? JSON.parse(String(raw)) : []); if (mounted) setEntries(list); } catch { if (mounted) setEntries([]); } };
+    (async () => { await refresh(); try { const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} }); return () => { try { sub.unsubscribe(); } catch {} }; } catch {} })();
+    return () => { mounted = false; };
   }, []);
-
-  useEffect(() => {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(entries));
-  }, [entries]);
+  useEffect(() => { (async () => { try { await kvStore.set(STORAGE_KEY, entries); } catch {} })(); }, [entries]);
 
   const total = useMemo(() => form.base + form.overtime + form.bonus - form.deduction, [form]);
 

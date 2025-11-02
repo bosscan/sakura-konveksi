@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Box, Typography, Grid, TextField, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter } from '@mui/material';
 import { ResponsiveContainer, ComposedChart, Bar as RBar, Line as RLine, XAxis as RXAxis, YAxis as RYAxis, CartesianGrid, Tooltip as RTooltip, Legend as RLegend } from 'recharts';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type GajiEntry = {
   id: string;
@@ -22,11 +23,12 @@ const GajiReport: React.FC = () => {
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [month, setMonth] = useState(defaultMonth);
 
-  const entries: GajiEntry[] = useMemo(() => {
-    try {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      return raw ? JSON.parse(raw) : [];
-    } catch { return []; }
+  const [entries, setEntries] = useState<GajiEntry[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? (raw as GajiEntry[]) : (raw ? JSON.parse(String(raw)) : []); if (mounted) setEntries(list); } catch { if (mounted) setEntries([]); } };
+    (async () => { await refresh(); try { const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} }); return () => { try { sub.unsubscribe(); } catch {} }; } catch {} })();
+    return () => { mounted = false; };
   }, []);
 
   const filtered = useMemo(() => entries.filter(e => e.date.startsWith(`${month}-`)), [entries, month]);

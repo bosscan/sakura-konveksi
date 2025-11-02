@@ -1,7 +1,8 @@
-import React, { useMemo, useState, useRef } from "react";
+import React, { useMemo, useState, useRef, useEffect } from "react";
 import { Box, Typography, Grid, TextField, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter } from '@mui/material';
 import { ResponsiveContainer, ComposedChart, Bar as RBar, Line as RLine, XAxis as RXAxis, YAxis as RYAxis, CartesianGrid, Tooltip as RTooltip, Legend as RLegend } from 'recharts';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type Item = {
   id: string;
@@ -21,8 +22,26 @@ const BelanjaReport: React.FC = () => {
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [month, setMonth] = useState(defaultMonth);
 
-  const items: Item[] = useMemo(() => {
-    try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; }
+  const [items, setItems] = useState<Item[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get(STORAGE_KEY);
+        const list = Array.isArray(raw) ? (raw as Item[]) : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setItems(list);
+      } catch {
+        if (mounted) setItems([]);
+      }
+    };
+    (async () => {
+      await refresh();
+      try {
+        const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} });
+        return () => { try { sub.unsubscribe(); } catch {} };
+      } catch {}
+    })();
+    return () => { mounted = false; };
   }, []);
 
   const filtered = useMemo(() => items.filter(i => i.date.startsWith(`${month}-`)), [items, month]);

@@ -1,7 +1,7 @@
 import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, Typography, TextField, MenuItem, Button, Stack } from "@mui/material";
 import PrintIcon from '@mui/icons-material/Print';
-import { runAllMigrationsOnce } from '../../../lib/migrations';
 import { useEffect, useRef, useState } from "react";
+import kvStore from '../../../lib/kvStore';
 import TableExportToolbar from '../../../components/TableExportToolbar';
 
 type SPKRow = {
@@ -79,29 +79,28 @@ export default function SpkOnProses() {
   };
 
   useEffect(() => {
-    // Normalize legacy localStorage data
-    try { runAllMigrationsOnce(); } catch { }
-    const refresh = () => {
+    // Legacy localStorage migrations removed; relying solely on kvStore data
+  const refresh = async () => {
       try {
         const qKey = 'plotting_rekap_bordir_queue';
         const pipeKey = 'spk_pipeline';
         const rbKey = 'method_rekap_bordir';
         const adKey = 'antrian_input_desain';
 
-        const qRaw = localStorage.getItem(qKey);
-        const queue: any[] = qRaw ? JSON.parse(qRaw) : [];
-        const pRaw = localStorage.getItem(pipeKey);
-        const pipeline: any[] = pRaw ? JSON.parse(pRaw) : [];
-        const rbRaw = localStorage.getItem(rbKey);
-        const rbList: any[] = rbRaw ? JSON.parse(rbRaw) : [];
-        const adRaw = localStorage.getItem(adKey);
-        const adList: any[] = adRaw ? JSON.parse(adRaw) : [];
+        let queue: any[] = [];
+        try { const raw = await kvStore.get(qKey); queue = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { queue = []; }
+        let pipeline: any[] = [];
+        try { const raw = await kvStore.get(pipeKey); pipeline = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { pipeline = []; }
+        let rbList: any[] = [];
+        try { const raw = await kvStore.get(rbKey); rbList = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { rbList = []; }
+        let adList: any[] = [];
+        try { const raw = await kvStore.get(adKey); adList = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { adList = []; }
 
         // Load additional data sources for better data mapping
-        const keranjangRaw = localStorage.getItem('keranjang');
-        const keranjangList: any[] = keranjangRaw ? JSON.parse(keranjangRaw) : [];
-        const spkOrdersRaw = localStorage.getItem('spk_orders');
-        const spkOrdersMap: Record<string, any> = spkOrdersRaw ? JSON.parse(spkOrdersRaw) : {};
+        let keranjangList: any[] = [];
+        try { const raw = await kvStore.get('keranjang'); keranjangList = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { keranjangList = []; }
+        let spkOrdersMap: Record<string, any> = {};
+        try { const raw = await kvStore.get('spk_orders'); spkOrdersMap = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : {}); } catch { spkOrdersMap = {}; }
 
         // Robust lookup helper (same strategy as PrintSPK) to tolerate whitespace/number formatting
         const robustMapGet = (mapObj: Record<string, any>, key: string) => {
@@ -140,10 +139,10 @@ export default function SpkOnProses() {
           return !isNaN(n) && n > 0 ? n : 0;
         };
 
-        const prRaw = localStorage.getItem('production_recap_map');
-        const prMap: Record<string, any> = prRaw ? JSON.parse(prRaw) : {};
-        const terbitRaw = localStorage.getItem('spk_terbit_map');
-        const terbitMap: Record<string, string> = terbitRaw ? JSON.parse(terbitRaw) : {};
+  let prMap: Record<string, any> = {};
+  try { const pr = await kvStore.get('production_recap_map'); prMap = pr && typeof pr === 'object' ? pr : (pr ? JSON.parse(String(pr)) : {}); } catch { prMap = {}; }
+  let terbitMap: Record<string, string> = {} as any;
+  try { const tr = await kvStore.get('spk_terbit_map'); terbitMap = tr && typeof tr === 'object' ? tr : (tr ? JSON.parse(String(tr)) : {} as any); } catch { terbitMap = {} as any; }
         const format7 = (v: any) => {
           const m = String(v || '').match(/(\d{1,})/);
           return m ? String(Number(m[1])).padStart(7, '0') : '';
@@ -238,21 +237,25 @@ export default function SpkOnProses() {
         setRows([]);
       }
     };
-    const onStorage = (e: StorageEvent) => {
-      if ([
-        'plotting_rekap_bordir_queue',
-        'spk_pipeline',
-        'method_rekap_bordir',
-        'antrian_input_desain',
-        'spk_orders',
-        'keranjang',
-        'spk_terbit_map'
-      ].includes(e.key || '')) refresh();
-    };
     refresh();
-    window.addEventListener('storage', onStorage);
-    const timer = setInterval(refresh, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    // Subscribe to kvStore updates for realtime behavior
+    try {
+      const subs = [
+        kvStore.subscribe('plotting_rekap_bordir_queue', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('spk_pipeline', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('method_rekap_bordir', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('antrian_input_desain', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('spk_orders', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('keranjang', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('spk_terbit_map', () => { try { refresh(); } catch {} }),
+        kvStore.subscribe('production_recap_map', () => { try { refresh(); } catch {} }),
+      ];
+      const timer = setInterval(refresh, 3000);
+      return () => { try { subs.forEach(s=>s.unsubscribe()); } catch {}; clearInterval(timer); };
+    } catch {
+      const timer = setInterval(refresh, 2000);
+      return () => clearInterval(timer);
+    }
   }, []);
 
   const [search, setSearch] = useState("");

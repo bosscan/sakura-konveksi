@@ -2,6 +2,7 @@ import { Box, TableContainer, Table, Paper, TableCell, TableRow, TableHead, Tabl
 import { useEffect, useMemo, useRef, useState } from "react";
 import TableExportToolbar from "../../components/TableExportToolbar";
 import Api from "../../lib/api";
+import kvStore from '../../lib/kvStore';
 
 type Row = {
   idRekapProduksi: string;
@@ -61,7 +62,6 @@ export default function PlottingRekapBordir() {
     const refresh = async () => {
       try {
         let apiList: any[] = [];
-        let localList: any[] = [];
         try {
           const r = await Api.getPlottingQueue();
           apiList = Array.isArray(r) ? r.map((x) => ({
@@ -76,12 +76,8 @@ export default function PlottingRekapBordir() {
         } catch {
           apiList = [];
         }
-        try {
-          const raw = localStorage.getItem(key);
-          localList = raw ? JSON.parse(raw) : [];
-        } catch {
-          localList = [];
-        }
+        let localList: any[] = [];
+        try { localList = (await kvStore.get(key)) || []; } catch { localList = []; }
 
         // Merge API + local (dedupe by idSpk, prefer API entries)
         const unionByIdSpk = (a: any[], b: any[]) => {
@@ -98,8 +94,8 @@ export default function PlottingRekapBordir() {
         };
         const list = unionByIdSpk(apiList, localList);
   // Load production recap mapping and helpers
-        const prRaw = localStorage.getItem('production_recap_map');
-        const prMap: Record<string, any> = prRaw ? JSON.parse(prRaw) : {};
+        const prRaw = (await kvStore.get('production_recap_map')) || {};
+        const prMap: Record<string, any> = prRaw && typeof prRaw === 'object' ? prRaw : {};
         const format7 = (v: any) => {
           const m = String(v || '').match(/(\d{1,})/);
           return m ? String(Number(m[1])).padStart(7, '0') : '';
@@ -132,10 +128,9 @@ export default function PlottingRekapBordir() {
       }
     };
     refresh();
-    const onStorage = (e: StorageEvent) => { if (e.key === key) refresh(); };
-    window.addEventListener('storage', onStorage);
+    const sub = kvStore.subscribe(key, () => refresh());
     const timer = setInterval(refresh, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(timer); };
+    return () => { try { sub.unsubscribe(); } catch {} ; clearInterval(timer); };
   }, []);
 
   const [search, setSearch] = useState("");
@@ -192,17 +187,18 @@ export default function PlottingRekapBordir() {
     if (selectedRows.length === 0) return;
     // Rekap Bordir ID: 7 digits starting at 0000001, increments every plotting action
     const RB_COUNTER_KEY = 'rekap_bordir_counter';
-    const nextRekapBordirId = (): string => {
+    const nextRekapBordirId = async (): Promise<string> => {
       let counter = 0;
       try {
-        const raw = Number(localStorage.getItem(RB_COUNTER_KEY) || 0);
+        const rawVal = await kvStore.get(RB_COUNTER_KEY);
+        const raw = Number(rawVal || 0);
         if (!isNaN(raw) && raw >= 0) counter = raw;
       } catch {}
       const next = counter + 1;
-      try { localStorage.setItem(RB_COUNTER_KEY, String(next)); } catch {}
+      try { await kvStore.set(RB_COUNTER_KEY, String(next)); } catch {}
       return String(next).padStart(7, '0');
     };
-    const rekapId = nextRekapBordirId();
+    const rekapId = await nextRekapBordirId();
     try {
       // 1) Call backend to generate; fallback to localStorage history
       const payload = { rekapId, items: selectedRows.map((it) => ({
@@ -221,19 +217,19 @@ export default function PlottingRekapBordir() {
         // noop, will do local storage shadow below
       }
 
-      // 1b) Persist to method_rekap_bordir (history) locally for compatibility
-      const rbKey = "method_rekap_bordir";
-      const rbRaw = localStorage.getItem(rbKey);
-      const rbList: any[] = rbRaw ? JSON.parse(rbRaw) : [];
+    // 1b) Persist to method_rekap_bordir (history) in KV for compatibility
+    const rbKey = "method_rekap_bordir";
+    const rbRaw = (await kvStore.get(rbKey)) || [];
+    const rbList: any[] = Array.isArray(rbRaw) ? rbRaw : [];
   const createdAt = new Date().toISOString();
   rbList.push({ rekapId, createdAt, items: selectedRows });
-      localStorage.setItem(rbKey, JSON.stringify(rbList));
+    await kvStore.set(rbKey, rbList);
 
       // 2) Seed selected items into spk_pipeline locally if API failed to do it
-      const pipeKey = 'spk_pipeline';
-      const pRaw = localStorage.getItem(pipeKey);
-      const pipeline: any[] = pRaw ? JSON.parse(pRaw) : [];
-      const exists = new Set<string>((pipeline || []).map((p: any) => p?.idSpk).filter(Boolean));
+  const pipeKey = 'spk_pipeline';
+  const pRaw = (await kvStore.get(pipeKey)) || [];
+  const pipeline: any[] = Array.isArray(pRaw) ? pRaw : [];
+  const exists = new Set<string>((pipeline || []).map((p: any) => p?.idSpk).filter(Boolean));
 
       if (!usedApi) {
         selectedRows.forEach((it) => {
@@ -255,15 +251,15 @@ export default function PlottingRekapBordir() {
             selesaiPlottingBordir: createdAt,
           });
         });
-        localStorage.setItem(pipeKey, JSON.stringify(pipeline));
+  await kvStore.set(pipeKey, pipeline);
       }
 
       // 3) Remove selected from plotting queue locally (backend already deletes on success)
-      const qKey = 'plotting_rekap_bordir_queue';
-      const qRaw = localStorage.getItem(qKey);
-      const queue: any[] = qRaw ? JSON.parse(qRaw) : [];
-      const remaining = (queue || []).filter((q) => !selectedIds.includes(q?.idSpk));
-      localStorage.setItem(qKey, JSON.stringify(remaining));
+  const qKey = 'plotting_rekap_bordir_queue';
+  const qRaw = (await kvStore.get(qKey)) || [];
+  const queue: any[] = Array.isArray(qRaw) ? qRaw : [];
+  const remaining = (queue || []).filter((q) => !selectedIds.includes(q?.idSpk));
+  await kvStore.set(qKey, remaining);
 
   alert(`Rekap Bordir berhasil dibuat: ${rekapId}`);
       setSelectedIds([]);

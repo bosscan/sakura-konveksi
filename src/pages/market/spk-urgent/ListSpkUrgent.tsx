@@ -1,6 +1,7 @@
 /* eslint-disable @typescript-eslint/no-explicit-any */
 import { Box, IconButton, Paper, Table, TableBody, TableCell, TableHead, TableRow, TextField, Typography, Stack } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
+import kvStore from '../../../lib/kvStore';
 import DeleteIcon from '@mui/icons-material/Delete';
 
 type UrgentItem = { idSpk: string; deadline: string; note: string; createdAt: string; updatedAt: string };
@@ -51,15 +52,55 @@ export default function ListSpkUrgent() {
     return `${date} ${time}`;
   };
 
-  const load = () => {
-    try { setItems(JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]')); } catch { setItems([]); }
-  };
+  // Load urgent list and subscribe
   useEffect(() => {
-    load();
-    const onStorage = (e: StorageEvent) => { if (e.key === STORAGE_KEY) load(); };
-    window.addEventListener('storage', onStorage);
-    const t = setInterval(load, 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
+    let mounted = true;
+    const refresh = async () => {
+      try {
+        const raw = await kvStore.get(STORAGE_KEY);
+        const arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+        if (mounted) setItems(arr);
+      } catch { if (mounted) setItems([]); }
+    };
+    refresh();
+    const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} });
+    const timer = setInterval(() => { try { refresh(); } catch {} }, 2000);
+    return () => { mounted = false; try { sub.unsubscribe(); } catch {}; clearInterval(timer); };
+  }, []);
+
+  // Supporting datasets from KV to enrich display and status
+  const [queuePlotting, setQueuePlotting] = useState<any[]>([]);
+  const [pipeline, setPipeline] = useState<any[]>([]);
+  const [antrian, setAntrian] = useState<any[]>([]);
+  const [designQueue, setDesignQueue] = useState<any[]>([]);
+  const [keranjang, setKeranjang] = useState<any[]>([]);
+  const [spkDesign, setSpkDesign] = useState<Record<string, any>>({});
+  const [spkOrders, setSpkOrders] = useState<Record<string, any>>({});
+  const [rekapBordir, setRekapBordir] = useState<any[]>([]);
+
+  useEffect(() => {
+    const setup = (key: string, setter: (v: any) => void) => {
+      const refresh = async () => {
+        try {
+          const raw = await kvStore.get(key);
+          const v = Array.isArray(raw) ? raw : (raw && typeof raw === 'object' && !Array.isArray(raw) && key === 'spk_design' ? raw : (raw ? JSON.parse(String(raw)) : (key === 'spk_design' || key === 'spk_orders' ? {} : [])));
+          setter(v);
+        } catch { setter(key === 'spk_design' || key === 'spk_orders' ? {} : []); }
+      };
+      refresh();
+      const sub = kvStore.subscribe(key, () => { try { refresh(); } catch {} });
+      return () => { try { sub.unsubscribe(); } catch {} };
+    };
+    const cleanups: Array<() => void> = [];
+    cleanups.push(setup('plotting_rekap_bordir_queue', setQueuePlotting));
+    cleanups.push(setup('spk_pipeline', setPipeline));
+    cleanups.push(setup('antrian_input_desain', setAntrian));
+    cleanups.push(setup('design_queue', setDesignQueue));
+    cleanups.push(setup('keranjang', setKeranjang));
+    cleanups.push(setup('spk_design', setSpkDesign));
+    cleanups.push(setup('spk_orders', setSpkOrders));
+    cleanups.push(setup('method_rekap_bordir', setRekapBordir));
+    return () => { cleanups.forEach(fn => fn()); };
   }, []);
 
   const spkMap: Record<string, SpkDetails> = useMemo(() => {
@@ -93,30 +134,24 @@ export default function ListSpkUrgent() {
         kuantity: Math.max(cur.kuantity || 0, qty),
       };
     };
-    let pipeline: any[] = [];
-    let queue: any[] = [];
-    try { queue = JSON.parse(localStorage.getItem('plotting_rekap_bordir_queue') || '[]') as any[]; queue.forEach(push); } catch {}
-    try { pipeline = JSON.parse(localStorage.getItem('spk_pipeline') || '[]') as any[]; pipeline.forEach(push); } catch {}
-    try { (JSON.parse(localStorage.getItem('antrian_input_desain') || '[]') as any[]).forEach(push); } catch {}
+    try { (queuePlotting || []).forEach(push); } catch {}
+    try { (pipeline || []).forEach(push); } catch {}
+    try { (antrian || []).forEach(push); } catch {}
     try {
-      const dqueue: any[] = JSON.parse(localStorage.getItem('design_queue') || '[]') || [];
       const dmap: Record<string, any> = {};
-      dqueue.forEach((d) => { if (d?.idSpk) dmap[d.idSpk] = d; });
+      (designQueue || []).forEach((d: any) => { if (d?.idSpk) dmap[d.idSpk] = d; });
       Object.entries(dmap).forEach(([id, it]) => push({ idSpk: id, ...it }));
     } catch {}
-    try { (JSON.parse(localStorage.getItem('keranjang') || '[]') as any[]).forEach(push); } catch {}
-    try {
-      const dsMap: Record<string, any> = JSON.parse(localStorage.getItem('spk_design') || '{}') || {};
-      Object.entries(dsMap).forEach(([id, it]) => push({ idSpk: id, ...it }));
-    } catch {}
+    try { (keranjang || []).forEach(push); } catch {}
+    try { Object.entries(spkDesign || {}).forEach(([id, it]) => push({ idSpk: id, ...it })); } catch {}
 
     // Build helper maps for deadline calculation
-    const adList: any[] = (() => { try { return JSON.parse(localStorage.getItem('antrian_input_desain') || '[]') as any[]; } catch { return []; } })();
+  const adList: any[] = antrian || [];
     const adMap: Record<string, any> = {}; (adList || []).forEach((it) => { if (it?.idSpk) adMap[String(it.idSpk).trim()] = it; });
-    const cartList: any[] = (() => { try { return JSON.parse(localStorage.getItem('keranjang') || '[]') as any[]; } catch { return []; } })();
+  const cartList: any[] = keranjang || [];
     const cartMap: Record<string, any> = {}; (cartList || []).forEach((it) => { if (it?.idSpk) cartMap[String(it.idSpk).trim()] = it; });
-    const pipelineMap: Record<string, any> = {}; (pipeline || []).forEach((it) => { if (it?.idSpk) pipelineMap[String(it.idSpk).trim()] = it; });
-    const spkOrdersMap: Record<string, any> = (() => { try { return JSON.parse(localStorage.getItem('spk_orders') || '{}') as Record<string, any>; } catch { return {}; } })();
+  const pipelineMap: Record<string, any> = {}; (pipeline || []).forEach((it) => { if (it?.idSpk) pipelineMap[String(it.idSpk).trim()] = it; });
+  const spkOrdersMap: Record<string, any> = spkOrders || {};
 
     const calcDeadlineAwal = (id: string) => {
       const src = adMap[id] || {};
@@ -155,11 +190,11 @@ export default function ListSpkUrgent() {
       });
       statusById[id] = cur;
     };
-    try { (JSON.parse(localStorage.getItem('spk_pipeline') || '[]') as any[]).forEach(push); } catch {}
-    try { (JSON.parse(localStorage.getItem('plotting_rekap_bordir_queue') || '[]') as any[]).forEach(push); } catch {}
+    try { (pipeline || []).forEach(push); } catch {}
+    try { (queuePlotting || []).forEach(push); } catch {}
     try {
       // Derive selesaiPlottingBordir from method_rekap_bordir createdAt like SpkOnProses
-      const rbList: any[] = JSON.parse(localStorage.getItem('method_rekap_bordir') || '[]') || [];
+      const rbList: any[] = rekapBordir || [];
       rbList.forEach((rb) => {
         const createdAt = rb?.createdAt;
         (rb?.items || []).forEach((it: any) => {
@@ -185,9 +220,9 @@ export default function ListSpkUrgent() {
     return out;
   }, [spkMap]);
 
-  const remove = (idSpk: string) => {
+  const remove = async (idSpk: string) => {
     const next = items.filter((it) => (it.idSpk || '').trim() !== idSpk.trim());
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
+    try { await kvStore.set(STORAGE_KEY, next); } catch {}
     setItems(next);
   };
 

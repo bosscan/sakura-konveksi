@@ -2,6 +2,7 @@ import { Box, IconButton, Paper, Stack, Table, TableBody, TableCell, TableContai
 import html2canvas from "html2canvas";
 import jsPDF from "jspdf";
 import { useEffect, useMemo, useRef, useState } from "react";
+import kvStore from "../../lib/kvStore";
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import DownloadIcon from '@mui/icons-material/Download';
 
@@ -32,15 +33,17 @@ export default function DatabaseInvoice() {
   const COMPANY_PHONE = "082245081126";
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem('invoice_records');
-      const map = raw ? JSON.parse(raw) : {} as Record<string, InvoiceRecord>;
-      const arr: InvoiceRecord[] = Object.values(map || {});
-      arr.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
-      setData(arr);
-    } catch {
-      setData([]);
-    }
+    (async () => {
+      try {
+        const raw = await kvStore.get('invoice_records');
+        const map = raw && typeof raw === 'object' ? raw as Record<string, InvoiceRecord> : (raw ? JSON.parse(String(raw)) : {});
+        const arr: InvoiceRecord[] = Object.values(map || {});
+        arr.sort((a,b) => (b.date || '').localeCompare(a.date || ''));
+        setData(arr);
+      } catch {
+        setData([]);
+      }
+    })();
   }, []);
 
   const openOrDownload = async (rec: InvoiceRecord, openInNewTab: boolean) => {

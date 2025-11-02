@@ -1,6 +1,7 @@
-import React, { useMemo, useState, useRef } from 'react';
+import React, { useMemo, useState, useRef, useEffect } from 'react';
 import { Box, Typography, Grid, TextField, TableContainer, Table, Paper, TableCell, TableRow, TableHead, TableBody, TableFooter } from '@mui/material';
 import TableExportToolbar from '../../../../components/TableExportToolbar';
+import kvStore from '../../../../lib/kvStore';
 
 type Overhead = { id: string; date: string; amount: number };
 const STORAGE_KEY = 'pengeluaran_overhead_pabrik';
@@ -8,7 +9,13 @@ const currency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
 
 const OverheadReport: React.FC = () => {
   const [month, setMonth] = useState<string>(new Date().toISOString().slice(0,7));
-  const data: Overhead[] = useMemo(() => { try { const raw = localStorage.getItem(STORAGE_KEY); return raw ? JSON.parse(raw) : []; } catch { return []; } }, []);
+  const [data, setData] = useState<Overhead[]>([]);
+  useEffect(() => {
+    let mounted = true;
+    const refresh = async () => { try { const raw = await kvStore.get(STORAGE_KEY); const list = Array.isArray(raw) ? (raw as Overhead[]) : (raw ? JSON.parse(String(raw)) : []); if (mounted) setData(list); } catch { if (mounted) setData([]); } };
+    (async () => { await refresh(); try { const sub = kvStore.subscribe(STORAGE_KEY, () => { try { refresh(); } catch {} }); return () => { try { sub.unsubscribe(); } catch {} }; } catch {} })();
+    return () => { mounted = false; };
+  }, []);
   const filtered = useMemo(() => data.filter(i => i.date?.startsWith(`${month}-`)), [data, month]);
   const perDate = useMemo(() => {
     const map = new Map<string, number>();

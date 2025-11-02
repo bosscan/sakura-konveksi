@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { Box, Typography, Grid, TextField, Chip, Stack, TableContainer, Paper, Table, TableHead, TableRow, TableCell, TableBody, TableFooter } from '@mui/material';
 import TableExportToolbar from '../../../components/TableExportToolbar';
 import { ResponsiveContainer, ComposedChart, XAxis, YAxis, CartesianGrid, Tooltip as RTooltip, Legend as RLegend, Bar as RBar, Line as RLine } from 'recharts';
+import kvStore from '../../../lib/kvStore';
 
 type Income = { date: string; omsetDp: number; omsetPelunasan: number; omsetDpl: number };
 type Gaji = { date: string; base: number; overtime: number; bonus: number; deduction: number };
@@ -34,22 +35,77 @@ const Konsolidasi: React.FC = () => {
   const now = new Date();
   const defaultMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
   const [month, setMonth] = useState(defaultMonth);
-  // trigger recompute when source storages change
-  const [version, setVersion] = useState(0);
-  useEffect(() => {
-    const onStorage = (e: StorageEvent) => {
-      if (['omset_pendapatan', 'pendapatan_harian', 'pengeluaran_gaji', 'pengeluaran_belanja_logistik', 'pengeluaran_fee_jaringan', 'pengeluaran_marketing_ads', 'pengeluaran_ongkir', 'pengeluaran_maintenance_mesin', 'pengeluaran_overhead_pabrik'].includes(e.key || '')) {
-        setVersion(v => v + 1);
-      }
-    };
-    window.addEventListener('storage', onStorage);
-    const t = setInterval(() => setVersion(v => v + 1), 2000);
-    return () => { window.removeEventListener('storage', onStorage); clearInterval(t); };
-  }, []);
+  // kvStore-backed datasets and subscriptions
+  const [incomeRaw, setIncomeRaw] = useState<Income[]>([]); // optional 'pendapatan_harian'
+  const [txIncome, setTxIncome] = useState<Income[]>([]); // aggregated from 'omset_pendapatan'
+  const [gaji, setGaji] = useState<Gaji[]>([]);
+  const [belanja, setBelanja] = useState<Belanja[]>([]);
+  const [fee, setFee] = useState<Fee[]>([]);
+  const [ads, setAds] = useState<Ads[]>([]);
+  const [ongkir, setOngkir] = useState<Ongkir[]>([]);
+  const [maint, setMaint] = useState<Maint[]>([]);
+  const [overhead, setOverhead] = useState<Overhead[]>([]);
 
-  // Load optional pendapatan from localStorage (user can provide externally). Key: 'pendapatan_harian'
-  const incomeRaw: Income[] = useMemo(() => {
-    try { return JSON.parse(localStorage.getItem('pendapatan_harian') || '[]'); } catch { return []; }
+  useEffect(() => {
+    let mounted = true;
+    const KEYS = {
+      TX: 'omset_pendapatan',
+      HARIAN: 'pendapatan_harian',
+      GAJI: 'pengeluaran_gaji',
+      BELANJA: 'pengeluaran_belanja_logistik',
+      FEE: 'pengeluaran_fee_jaringan',
+      ADS: 'pengeluaran_marketing_ads',
+      ONGKIR: 'pengeluaran_ongkir',
+      MAINT: 'pengeluaran_maintenance_mesin',
+      OVERHEAD: 'pengeluaran_overhead_pabrik',
+    } as const;
+
+    const loadAll = async () => {
+      try {
+        const [txRaw, harian, gajiRaw, belanjaRaw, feeRaw, adsRaw, ongkirRaw, maintRaw, overheadRaw] = await Promise.all([
+          kvStore.get(KEYS.TX), kvStore.get(KEYS.HARIAN), kvStore.get(KEYS.GAJI), kvStore.get(KEYS.BELANJA), kvStore.get(KEYS.FEE), kvStore.get(KEYS.ADS), kvStore.get(KEYS.ONGKIR), kvStore.get(KEYS.MAINT), kvStore.get(KEYS.OVERHEAD)
+        ]);
+        if (!mounted) return;
+        // income transactions aggregation
+        try {
+          const txList: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = Array.isArray(txRaw) ? (txRaw as any) : (txRaw ? JSON.parse(String(txRaw)) : []);
+          const map = new Map<string, Income>();
+          for (const r of txList) {
+            const date = (r.tanggal || '').slice(0, 10);
+            if (!date) continue;
+            const tipe = (r.tipeTransaksi || '').toLowerCase();
+            const nominal = Number(r.nominal) || 0;
+            const cur = map.get(date) || { date, omsetDp: 0, omsetPelunasan: 0, omsetDpl: 0 };
+            if (tipe === 'dp') cur.omsetDp += nominal;
+            else if (tipe === 'pelunasan') cur.omsetPelunasan += nominal;
+            else if (tipe === 'dpl') cur.omsetDpl += nominal;
+            map.set(date, cur);
+          }
+          setTxIncome(Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date)));
+        } catch { setTxIncome([]); }
+
+        try { setIncomeRaw(Array.isArray(harian) ? (harian as Income[]) : (harian ? JSON.parse(String(harian)) : [])); } catch { setIncomeRaw([]); }
+        try { setGaji(Array.isArray(gajiRaw) ? (gajiRaw as Gaji[]) : (gajiRaw ? JSON.parse(String(gajiRaw)) : [])); } catch { setGaji([]); }
+        try { setBelanja(Array.isArray(belanjaRaw) ? (belanjaRaw as Belanja[]) : (belanjaRaw ? JSON.parse(String(belanjaRaw)) : [])); } catch { setBelanja([]); }
+        try { setFee(Array.isArray(feeRaw) ? (feeRaw as Fee[]) : (feeRaw ? JSON.parse(String(feeRaw)) : [])); } catch { setFee([]); }
+        try { setAds(Array.isArray(adsRaw) ? (adsRaw as Ads[]) : (adsRaw ? JSON.parse(String(adsRaw)) : [])); } catch { setAds([]); }
+        try { setOngkir(Array.isArray(ongkirRaw) ? (ongkirRaw as Ongkir[]) : (ongkirRaw ? JSON.parse(String(ongkirRaw)) : [])); } catch { setOngkir([]); }
+        try { setMaint(Array.isArray(maintRaw) ? (maintRaw as Maint[]) : (maintRaw ? JSON.parse(String(maintRaw)) : [])); } catch { setMaint([]); }
+        try { setOverhead(Array.isArray(overheadRaw) ? (overheadRaw as Overhead[]) : (overheadRaw ? JSON.parse(String(overheadRaw)) : [])); } catch { setOverhead([]); }
+      } catch {}
+    };
+
+    (async () => {
+      await loadAll();
+      // subscriptions
+      const subs: Array<{ unsubscribe: () => void }> = [];
+      const keys = Object.values(KEYS);
+      for (const k of keys) {
+        try { subs.push(kvStore.subscribe(k, () => { try { loadAll(); } catch {} })); } catch {}
+      }
+      return () => { subs.forEach(s => { try { s.unsubscribe(); } catch {} }); };
+    })();
+    return () => { mounted = false; };
   }, []);
 
   // Fallback demo income for selected month (first 5 working days) if no data available
@@ -73,48 +129,24 @@ const Konsolidasi: React.FC = () => {
     return list;
   }, [month]);
 
-  // Aggregate authoritative transactions: localStorage('omset_pendapatan') => Income[] per date
-  const txIncome: Income[] = useMemo(() => {
-    try {
-      const raw = localStorage.getItem('omset_pendapatan');
-      const list: Array<{ tanggal: string; tipeTransaksi: string; nominal: number }> = raw ? JSON.parse(raw) : [];
-      const prefix = `${month}-`;
-      const map = new Map<string, Income>();
-      for (const r of list) {
-        const date = (r.tanggal || '').slice(0, 10);
-        if (!date || !date.startsWith(prefix)) continue;
-        const tipe = (r.tipeTransaksi || '').toLowerCase();
-        const nominal = Number(r.nominal) || 0;
-        const cur = map.get(date) || { date, omsetDp: 0, omsetPelunasan: 0, omsetDpl: 0 };
-        if (tipe === 'dp') cur.omsetDp += nominal;
-        else if (tipe === 'pelunasan') cur.omsetPelunasan += nominal;
-        else if (tipe === 'dpl') cur.omsetDpl += nominal;
-        else cur.omsetDpl += 0; // unknown types ignored
-        map.set(date, cur);
-      }
-      return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
-    } catch { return []; }
-  }, [month, version]);
+  // Filter txIncome by current month prefix
+  const txIncomeM = useMemo(() => {
+    const prefix = `${month}-`;
+    return txIncome.filter(r => r.date?.startsWith(prefix));
+  }, [txIncome, month]);
 
   const incomeM = useMemo(() => {
     // Prefer transaction-based data; fallback to pendapatan_harian; then demo
-    const tx = txIncome;
+    const tx = txIncomeM;
     if (tx.length) return tx;
     const filtered = incomeRaw.filter(r => r.date?.startsWith(`${month}-`));
     const base = (filtered.length ? filtered : fallbackIncome)
       .filter(r => r.date?.startsWith(`${month}-`))
       .sort((a, b) => a.date.localeCompare(b.date));
     return base;
-  }, [txIncome, incomeRaw, month, fallbackIncome]);
+  }, [txIncomeM, incomeRaw, month, fallbackIncome]);
 
-  // Expense datasets
-  const gaji: Gaji[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_gaji') || '[]'); } catch { return []; } }, [version]);
-  const belanja: Belanja[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_belanja_logistik') || '[]'); } catch { return []; } }, [version]);
-  const fee: Fee[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_fee_jaringan') || '[]'); } catch { return []; } }, [version]);
-  const ads: Ads[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_marketing_ads') || '[]'); } catch { return []; } }, [version]);
-  const ongkir: Ongkir[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_ongkir') || '[]'); } catch { return []; } }, [version]);
-  const maint: Maint[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_maintenance_mesin') || '[]'); } catch { return []; } }, [version]);
-  const overhead: Overhead[] = useMemo(() => { try { return JSON.parse(localStorage.getItem('pengeluaran_overhead_pabrik') || '[]'); } catch { return []; } }, [version]);
+  // datasets already in state from kvStore
 
   // Filter per month
   const gajiM = useMemo(() => gaji.filter(i => i.date?.startsWith(`${month}-`)), [gaji, month]);

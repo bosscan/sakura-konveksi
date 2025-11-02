@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import type React from 'react';
 import { AppBar, Box, Button, Container, Divider, IconButton, Menu, MenuItem, Toolbar, Typography } from '@mui/material';
 import useMediaQuery from '@mui/material/useMediaQuery';
@@ -13,6 +13,7 @@ import ChevronRightIcon from '@mui/icons-material/ChevronRight';
 import { useNavigate } from 'react-router-dom';
 import { BRAND, LANDING_IMAGES, SOCIAL_LINKS } from '../lib/landingConfig';
 import { getObjectUrls } from '../lib/landingStore';
+import kvStore from '../lib/kvStore';
 
 function useAutoSlider(length: number, intervalMs = 4000) {
   const [index, setIndex] = useState(0);
@@ -41,29 +42,46 @@ function NavLink({ label, targetId }: { label: string; targetId: string }) {
 
 export default function Landing() {
   const navigate = useNavigate();
+  // Auth state from kvStore (no localStorage fallback)
+  const isAuthRef = useRef<boolean>(false);
+  useEffect(() => {
+    (async () => {
+      try {
+        const v = await kvStore.get('isAuthenticated');
+        if (typeof v === 'boolean') isAuthRef.current = v;
+      } catch {}
+    })();
+    const sub = kvStore.subscribe('isAuthenticated', (v) => {
+      if (typeof v === 'boolean') isAuthRef.current = v;
+    });
+    return () => { try { sub.unsubscribe(); } catch {} };
+  }, []);
   // Slider images: prefer IndexedDB keys -> object URLs; fallback to legacy URLs/defaults
   const [images, setImages] = useState<string[]>(LANDING_IMAGES);
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
-        const keysStr = localStorage.getItem('landing_images_keys');
-        const keys: string[] = keysStr ? JSON.parse(keysStr) : [];
+        const keys = (await kvStore.get('landing_images_keys')) as string[] | null;
         if (Array.isArray(keys) && keys.length) {
           const urlsMap = await getObjectUrls(keys);
           const ordered = keys.map(k => urlsMap[k]).filter(Boolean);
           if (mounted && ordered.length) setImages(ordered);
           return;
         }
-        // Legacy fallback
-        const legacyStr = localStorage.getItem('landing_images');
-        const legacy: string[] = legacyStr ? JSON.parse(legacyStr) : [];
-        if (mounted && Array.isArray(legacy) && legacy.length) setImages(legacy);
-      } catch {
-        /* ignore */
-      }
+      } catch { /* ignore */ }
     })();
-    return () => { mounted = false; };
+    const sub = kvStore.subscribe('landing_images_keys', async (v) => {
+      try {
+        const keys = Array.isArray(v) ? v as string[] : [];
+        if (keys.length) {
+          const urlsMap = await getObjectUrls(keys);
+          const ordered = keys.map(k => urlsMap[k]).filter(Boolean);
+          if (mounted) setImages(ordered);
+        }
+      } catch {}
+    });
+    return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
   }, []);
 
   // Previously we redirected authenticated users away from landing.
@@ -76,18 +94,13 @@ export default function Landing() {
   const isMobileMenuOpen = Boolean(mobileAnchor);
   const isContactOpen = Boolean(contactAnchor);
 
-  // Load dynamic content for other sections (katalog, testimonials, prices, gallery, socials)
-  const getLS = <T,>(k: string, fallback: T): T => {
-    try { const s = localStorage.getItem(k); return s ? JSON.parse(s) as T : fallback; } catch { return fallback; }
-  };
-  const katalog = getLS<{ title: string; description?: string; image?: string; imageKey?: string }[]>(
-    'landing_katalog',
-    [
-      { title: 'Jaket Varsity', description: 'Bahan premium, sablon/bordir rapi', image: images[0] },
-      { title: 'Jaket Hoodie', description: 'Nyaman dipakai harian', image: images[1 % images.length] },
-      { title: 'Jaket Coach', description: 'Ringan dan stylish', image: images[2 % images.length] },
-    ]
-  );
+  // Load dynamic content for other sections (katalog, testimonials, prices, gallery, socials) from kvStore
+  const [katalog, setKatalog] = useState<{ title: string; description?: string; image?: string; imageKey?: string }[]>([
+    { title: 'Jaket Varsity', description: 'Bahan premium, sablon/bordir rapi', image: images[0] },
+    { title: 'Jaket Hoodie', description: 'Nyaman dipakai harian', image: images[1 % images.length] },
+    { title: 'Jaket Coach', description: 'Ringan dan stylish', image: images[2 % images.length] },
+  ]);
+  useEffect(() => { (async () => { try { const v = await kvStore.get('landing_katalog'); if (Array.isArray(v)) setKatalog(v as any); } catch {} })(); const s = kvStore.subscribe('landing_katalog', (v)=>{ try { if (Array.isArray(v)) setKatalog(v as any); } catch {} }); return () => { try { s.unsubscribe(); } catch {} } }, []);
   // Resolve katalog imageKey -> object URL map
   const [katalogUrls, setKatalogUrls] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -100,43 +113,46 @@ export default function Landing() {
     })();
     return () => { mounted = false; };
   }, [JSON.stringify(katalog.map(k => k.imageKey))]);
-  const testimonials = getLS<{ name: string; quote: string }[]>(
-    'landing_testimonials',
-    [
-      { name: 'Pelanggan #1', quote: 'Respon cepat, hasil jahit rapi, pengiriman tepat waktu.' },
-      { name: 'Pelanggan #2', quote: 'Kualitas premium dan pelayanan ramah.' },
-    ]
-  );
-  const prices = getLS<{ name: string; price: string; description?: string }[]>(
-    'landing_prices',
-    [
-      { name: 'Varsity', price: 'Mulai 250K', description: 'Free konsultasi desain' },
-      { name: 'Hoodie', price: 'Mulai 200K', description: 'Minimal order fleksibel' },
-      { name: 'Coach', price: 'Mulai 230K', description: 'Harga transparan' },
-    ]
-  );
+  const [testimonials, setTestimonials] = useState<{ name: string; quote: string }[]>([
+    { name: 'Pelanggan #1', quote: 'Respon cepat, hasil jahit rapi, pengiriman tepat waktu.' },
+    { name: 'Pelanggan #2', quote: 'Kualitas premium dan pelayanan ramah.' },
+  ]);
+  useEffect(() => { (async () => { try { const v = await kvStore.get('landing_testimonials'); if (Array.isArray(v)) setTestimonials(v as any); } catch {} })(); const s = kvStore.subscribe('landing_testimonials', (v)=>{ try { if (Array.isArray(v)) setTestimonials(v as any); } catch {} }); return () => { try { s.unsubscribe(); } catch {} } }, []);
+  const [prices, setPrices] = useState<{ name: string; price: string; description?: string }[]>([
+    { name: 'Varsity', price: 'Mulai 250K', description: 'Free konsultasi desain' },
+    { name: 'Hoodie', price: 'Mulai 200K', description: 'Minimal order fleksibel' },
+    { name: 'Coach', price: 'Mulai 230K', description: 'Harga transparan' },
+  ]);
+  useEffect(() => { (async () => { try { const v = await kvStore.get('landing_prices'); if (Array.isArray(v)) setPrices(v as any); } catch {} })(); const s = kvStore.subscribe('landing_prices', (v)=>{ try { if (Array.isArray(v)) setPrices(v as any); } catch {} }); return () => { try { s.unsubscribe(); } catch {} } }, []);
   const [gallery, setGallery] = useState<string[]>(images);
   useEffect(() => {
     let live = true;
     (async () => {
       try {
-        const keysStr = localStorage.getItem('landing_gallery_keys');
-        const keys: string[] = keysStr ? JSON.parse(keysStr) : [];
+        const keys = (await kvStore.get('landing_gallery_keys')) as string[] | null;
         if (Array.isArray(keys) && keys.length) {
           const urlsMap = await getObjectUrls(keys);
           const ordered = keys.map(k => urlsMap[k]).filter(Boolean);
           if (live) setGallery(ordered);
-          return;
         }
-        const legacy: string[] = getLS<string[]>('landing_gallery', images);
-        if (live) setGallery(legacy);
-      } catch {
-        /* ignore */
-      }
+      } catch {}
     })();
-    return () => { live = false; };
+    const sub = kvStore.subscribe('landing_gallery_keys', async (v) => {
+      try {
+        const keys = Array.isArray(v) ? (v as string[]) : [];
+        if (keys.length) {
+          const urlsMap = await getObjectUrls(keys);
+          const ordered = keys.map(k => urlsMap[k]).filter(Boolean);
+          if (live) setGallery(ordered);
+        } else if (live) {
+          setGallery(images);
+        }
+      } catch {}
+    });
+    return () => { live = false; try { sub.unsubscribe(); } catch {} };
   }, []);
-  const socials = getLS<typeof SOCIAL_LINKS>('landing_social_links', SOCIAL_LINKS);
+  const [socials, setSocials] = useState<typeof SOCIAL_LINKS>(SOCIAL_LINKS);
+  useEffect(() => { (async () => { try { const v = await kvStore.get('landing_social_links'); if (v && typeof v === 'object') setSocials(v as any); } catch {} })(); const s = kvStore.subscribe('landing_social_links', (v)=>{ try { if (v && typeof v === 'object') setSocials(v as any); } catch {} }); return () => { try { s.unsubscribe(); } catch {} } }, []);
   // Company address and Google Maps link
   const addressText = 'Jalan Langensuryo KT II/176, Panembahan, Kecamatan Kraton, Kota Yogyakarta, Daerah Istimewa Yogyakarta 55131, Indonesia';
   const addressMapLink = `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(addressText)}`;
@@ -214,8 +230,7 @@ export default function Landing() {
               variant="contained"
               color="primary"
               onClick={() => {
-                const isAuth = !!localStorage.getItem('isAuthenticated');
-                navigate(isAuth ? '/' : '/login');
+                navigate(isAuthRef.current ? '/' : '/login');
               }}
               sx={{ ml: 1 }}
             >
@@ -239,7 +254,7 @@ export default function Landing() {
                 Hubungi Kami
               </MenuItem>
               <Divider />
-              <MenuItem onClick={() => { setMobileAnchor(null); const isAuth = !!localStorage.getItem('isAuthenticated'); navigate(isAuth ? '/' : '/login'); }}>Masuk</MenuItem>
+              <MenuItem onClick={() => { setMobileAnchor(null); navigate(isAuthRef.current ? '/' : '/login'); }}>Masuk</MenuItem>
             </Menu>
           </Box>
         </Toolbar>
