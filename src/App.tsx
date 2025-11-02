@@ -12,7 +12,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { allowedMenusForRole, LS_KEYS, clearAuth } from './lib/auth';
 import kvStore from './lib/kvStore';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle, Typography } from '@mui/material';
-import GlobalLoader from './components/layout/GlobalLoader';
+// GlobalLoader removed per request (overlay spinner felt disruptive)
 
 const NAVIGATION = [
   {
@@ -731,8 +731,6 @@ function App() {
         // homeUrl intentionally omitted to allow custom confirm before navigating
       }}
     >
-      {/* Global loading overlay for all data fetches */}
-      <GlobalLoader />
       <Outlet />
     </AppProvider>
     {/* Confirm navigate to landing */}
