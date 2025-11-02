@@ -42,17 +42,19 @@ function NavLink({ label, targetId }: { label: string; targetId: string }) {
 
 export default function Landing() {
   const navigate = useNavigate();
-  // Auth state from kvStore (no localStorage fallback)
+  // Auth state from kvStore (kvStore-only); tolerate legacy string 'true'
   const isAuthRef = useRef<boolean>(false);
   useEffect(() => {
     (async () => {
       try {
         const v = await kvStore.get('isAuthenticated');
         if (typeof v === 'boolean') isAuthRef.current = v;
+        else if (v === 'true') isAuthRef.current = true;
       } catch {}
     })();
     const sub = kvStore.subscribe('isAuthenticated', (v) => {
       if (typeof v === 'boolean') isAuthRef.current = v;
+      else if (v === 'true') isAuthRef.current = true;
     });
     return () => { try { sub.unsubscribe(); } catch {} };
   }, []);

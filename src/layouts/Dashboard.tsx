@@ -52,6 +52,7 @@ export default function Dashboard() {
     const [expenseMonth, setExpenseMonth] = useState({
         gaji: [] as Gaji[], belanja: [] as Belanja[], fee: [] as Fee[], ads: [] as Ads[], ongkir: [] as Ongkir[], maint: [] as Maint[], overhead: [] as Overhead[],
     });
+    const [loaded, setLoaded] = useState(false);
 
     useEffect(() => {
         let mounted = true;
@@ -148,9 +149,11 @@ export default function Dashboard() {
                     maint: maint.filter((i) => i.date?.startsWith(`${ym}-`)),
                     overhead: overhead.filter((i) => i.date?.startsWith(`${ym}-`)),
                 });
+                if (!loaded) setLoaded(true);
             } catch (e) {
                 setDesignQueueCount(0); setAntrianInputCount(0); setKeranjangCount(0); setPlottingCount(0); setSpkItems([]); setOmsetMonth([]);
                 setExpenseMonth({ gaji: [], belanja: [], fee: [], ads: [], ongkir: [], maint: [], overhead: [] });
+                if (!loaded) setLoaded(true);
             }
         };
 
@@ -329,54 +332,64 @@ export default function Dashboard() {
             {/* Top KPIs */}
             <Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Omset Bulan Ini" value={currency(totalOmset)} color="#1e88e5" subtitle={ym} />
+                    <DashboardCard loading={!loaded} title="Omset Bulan Ini" value={currency(totalOmset)} color="#1e88e5" subtitle={ym} />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Rata-rata Omset per Hari" value={currency(avgOmsetPerDay)} color="#e53935" subtitle={ym} />
+                    <DashboardCard loading={!loaded} title="Rata-rata Omset per Hari" value={currency(avgOmsetPerDay)} color="#e53935" subtitle={ym} />
                 </Grid>
                         <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                            <DashboardCard title="Proyeksi Omset (By Trend)" value={currency(projectedOmset)} color="#43a047" subtitle={ym} />
+                            <DashboardCard loading={!loaded} title="Proyeksi Omset (By Trend)" value={currency(projectedOmset)} color="#43a047" subtitle={ym} />
                         </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Total SPK On Proses" value={String(spkItems.length)} color="#8e24aa" subtitle="Akhir Pipeline" />
+                    <DashboardCard loading={!loaded} title="Total SPK On Proses" value={String(spkItems.length)} color="#8e24aa" subtitle="Akhir Pipeline" />
                 </Grid>
             </Grid>
 
             {/* Queue summary */}
             <Grid container spacing={2} sx={{ mb: 2 }}>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Pra Produksi (Desainer)" value={String(designQueueCount)} color="#6d4c41" subtitle="Antrian aktif" />
+                    <DashboardCard loading={!loaded} title="Pra Produksi (Desainer)" value={String(designQueueCount)} color="#6d4c41" subtitle="Antrian aktif" />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Antrian Input Desain" value={String(antrianInputCount)} color="#00acc1" />
+                    <DashboardCard loading={!loaded} title="Antrian Input Desain" value={String(antrianInputCount)} color="#00acc1" />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Keranjang" value={String(keranjangCount)} color="#ffb300" />
+                    <DashboardCard loading={!loaded} title="Keranjang" value={String(keranjangCount)} color="#ffb300" />
                 </Grid>
                 <Grid size={{ xs: 12, sm: 6, md: 3 }}>
-                    <DashboardCard title="Plotting Rekap Bordir" value={String(plottingCount)} color="#5e35b1" />
+                    <DashboardCard loading={!loaded} title="Plotting Rekap Bordir" value={String(plottingCount)} color="#5e35b1" />
                 </Grid>
             </Grid>
 
             {/* Charts row: Product distribution and Omset vs Pengeluaran */}
             <Grid container spacing={2}>
                         <Grid size={{ xs: 12, md: 6 }}>
-                            <ProductTable title="Antrian Produksi per Jenis Produk" rows={productChartData} onOpenDetails={openDetails} />
+                            <ProductTable loading={!loaded} title="Antrian Produksi per Jenis Produk" rows={productChartData} onOpenDetails={openDetails} />
                         </Grid>
                 <Grid size={{ xs: 12, md: 6 }}>
                     <Paper sx={{ p: 2 }}>
                         <Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>Omset vs Pengeluaran (Harian)</Typography>
-                        <ResponsiveContainer width="100%" height={280}>
-                            <LineChart data={omsetVsExpenseDaily}>
-                                <CartesianGrid strokeDasharray="3 3" />
-                                <XAxis dataKey="date" />
-                                <YAxis />
-                                <RTooltip formatter={(v: any) => currency(Number(v)||0)} />
-                                <RLegend />
-                                <Line type="monotone" dataKey="omset" name="Omset" stroke="#43a047" dot={false} />
-                                <Line type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#e53935" dot={false} />
-                            </LineChart>
-                        </ResponsiveContainer>
+                        {loaded ? (
+                          <ResponsiveContainer width="100%" height={280}>
+                              <LineChart data={omsetVsExpenseDaily}>
+                                  <CartesianGrid strokeDasharray="3 3" />
+                                  <XAxis dataKey="date" />
+                                  <YAxis />
+                                  <RTooltip formatter={(v: any) => currency(Number(v)||0)} />
+                                  <RLegend />
+                                  <Line type="monotone" dataKey="omset" name="Omset" stroke="#43a047" dot={false} />
+                                  <Line type="monotone" dataKey="pengeluaran" name="Pengeluaran" stroke="#e53935" dot={false} />
+                              </LineChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <Box sx={{ px: 1 }}>
+                            <Box sx={{ mb: 1, display: 'flex', gap: 1 }}>
+                              <Box sx={{ flex: 1, height: 18, bgcolor: 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
+                              <Box sx={{ width: 80, height: 18, bgcolor: 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
+                            </Box>
+                            <Box sx={{ height: 280, bgcolor: 'rgba(255,255,255,0.08)', borderRadius: 1 }} />
+                          </Box>
+                        )}
                     </Paper>
                 </Grid>
             </Grid>

@@ -1,4 +1,4 @@
-import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Link } from '@mui/material';
+import { Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Typography, Link, Skeleton } from '@mui/material';
 
 type Row = { name: string; count: number; qtyTotal?: number };
 
@@ -6,9 +6,10 @@ type Props = {
 	rows: Array<Row>;
 	title?: string;
 	onOpenDetails?: (name: string) => void;
+  loading?: boolean;
 };
 
-export default function ProductTable({ rows, title = 'Ringkasan Produk', onOpenDetails }: Props) {
+export default function ProductTable({ rows, title = 'Ringkasan Produk', onOpenDetails, loading = false }: Props) {
 	return (
 		<Paper sx={{ p: 2 }}>
 			<Typography variant="subtitle1" fontWeight={600} sx={{ mb: 1 }}>{title}</Typography>
@@ -22,7 +23,15 @@ export default function ProductTable({ rows, title = 'Ringkasan Produk', onOpenD
 						</TableRow>
 					</TableHead>
 					<TableBody>
-						{rows.length === 0 ? (
+						{loading ? (
+							[0,1,2,3,4].map((i) => (
+								<TableRow key={`sk-${i}`}>
+									<TableCell><Skeleton width={120} /></TableCell>
+									<TableCell align="right"><Skeleton width={40} /></TableCell>
+									<TableCell align="right"><Skeleton width={60} /></TableCell>
+								</TableRow>
+							))
+						) : rows.length === 0 ? (
 							<TableRow><TableCell colSpan={3} align="center">Tidak ada data</TableCell></TableRow>
 						) : rows.map((r) => (
 							<TableRow key={r.name}>

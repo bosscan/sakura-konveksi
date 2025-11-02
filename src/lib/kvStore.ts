@@ -1,18 +1,30 @@
 import { supabase } from './supabaseClient';
 
+// Simple in-memory cache to prevent "blip to empty" when network hiccups occur.
+// We keep the last-known-good value for each key during the SPA session.
+const memCache = new Map<string, any>();
+
 export const kvStore = {
   async get(key: string): Promise<any | null> {
     try {
       const { data, error } = await supabase.from('kv_store').select('value').eq('key', key).single();
-      if (error) return null;
-      return data?.value ?? null;
+      if (error) {
+        // On error, return last-known-good from memory if available
+        return memCache.has(key) ? memCache.get(key) : null;
+      }
+      const val = data?.value ?? null;
+      if (val !== null && val !== undefined) memCache.set(key, val);
+      return val;
     } catch (e) {
-      return null;
+      // On exception, prefer last-known-good
+      return memCache.has(key) ? memCache.get(key) : null;
     }
   },
 
   async set(key: string, value: any) {
     try {
+      // Update cache eagerly to keep UI consistent
+      memCache.set(key, value);
       await supabase.from('kv_store').upsert({ key, value });
     } catch (e) {
       // ignore
@@ -21,6 +33,7 @@ export const kvStore = {
 
   async remove(key: string) {
     try {
+      memCache.delete(key);
       await supabase.from('kv_store').delete().eq('key', key);
     } catch (e) {
       // ignore
@@ -33,8 +46,15 @@ export const kvStore = {
       .channel(`kv_store_${key}`)
       .on('postgres_changes', { event: '*', schema: 'public', table: 'kv_store', filter: `key=eq.${key}` }, (payload: any) => {
         try {
-          if (payload.eventType === 'DELETE') cb(null);
-          else cb(payload.new?.value ?? null);
+          if (payload.eventType === 'DELETE') {
+            memCache.delete(key);
+            cb(null);
+          } else {
+            const val = payload.new?.value ?? null;
+            if (val !== null && val !== undefined) memCache.set(key, val);
+            else memCache.delete(key);
+            cb(val);
+          }
         } catch {}
       })
       .subscribe();

@@ -47,7 +47,8 @@ import kvStore from './kvStore';
 
 export const saveAuth = async (role: Role, username?: string, rememberUsername?: boolean) => {
   try {
-    await kvStore.set(LS_KEYS.IS_AUTH, 'true');
+    // Normalize to boolean true for consistent reads across app
+    await kvStore.set(LS_KEYS.IS_AUTH, true);
     await kvStore.set(LS_KEYS.USER_ROLE, role);
     if (rememberUsername && username) await kvStore.set(LS_KEYS.REMEMBER_USERNAME, username);
     if (!rememberUsername) await kvStore.remove(LS_KEYS.REMEMBER_USERNAME);
