@@ -146,20 +146,21 @@ button:focus-visible {
     -webkit-overflow-scrolling: touch;
   }
 
-  /* Keep columns readable by preventing over-shrinking */
+  /* Keep columns readable by allowing natural content sizing (no fixed layout) */
   .MuiTable-root {
-    min-width: 720px; /* adjust if you consistently have wider tables */
-    table-layout: fixed;
+    min-width: 720px; /* many tables define larger minWidth inline and will expand */
+    table-layout: auto;
   }
 
-  /* Make cells more compact and left-align by default on mobile */
+  /* Make cells compact and ensure text is NOT truncated on mobile */
   .MuiTableCell-root {
     padding: 6px 8px;
-    font-size: 0.85rem;
+    font-size: 0.80rem; /* slightly smaller to help long IDs fit */
     text-align: left !important;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    white-space: nowrap;     /* keep on one line */
+    overflow: visible;       /* do not clip content */
+    text-overflow: initial;  /* disable ellipsis */
+    max-width: none;         /* allow cell to expand */
   }
 
   /* Opt-in class to wrap long text when needed inside a cell */
