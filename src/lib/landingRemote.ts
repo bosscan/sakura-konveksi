@@ -1,6 +1,8 @@
 import { supabase } from './supabaseClient';
 
-const BUCKET = 'landing';
+// Allow overriding bucket name via env; default to 'landing'
+const BUCKET = (import.meta as any).env?.VITE_SUPABASE_BUCKET || 'landing';
+export const landingBucketName = BUCKET as string;
 
 function uuid(): string {
   if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {

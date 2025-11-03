@@ -27,7 +27,7 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import { LANDING_IMAGES, SOCIAL_LINKS } from '../../lib/landingConfig';
 import kvStore from '../../lib/kvStore';
 import { getObjectUrl, getObjectUrls, saveFiles, getBlob } from '../../lib/landingStore';
-import { uploadFilesToCloud } from '../../lib/landingRemote';
+import { uploadFilesToCloud, landingBucketName } from '../../lib/landingRemote';
 
 // Storage keys
 const K = {
@@ -228,7 +228,7 @@ export default function LandingContentEditor() {
         {/* Slider Foto */}
         {tab === 0 && (
           <Box sx={{ p: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap', alignItems: 'center' }}>
               <Button variant="outlined" startIcon={<UploadIcon />} component="label">
                 Upload Foto
                 <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
@@ -254,10 +254,17 @@ export default function LandingContentEditor() {
                     if (urls.length) setImageCloud(prev => [...prev, ...urls]);
                     setSnack({ open: true, message: 'Upload cloud berhasil. Jangan lupa Simpan.', severity: 'success' });
                   } catch (err: any) {
-                    setSnack({ open: true, message: `Upload cloud gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                    const msg = String(err?.message || err?.error?.message || 'Supabase Storage error');
+                    const hint = msg.toLowerCase().includes('bucket not found')
+                      ? `Bucket "${landingBucketName}" belum ada atau tidak public. Buat bucket di Supabase Storage (Public) lalu coba lagi.`
+                      : '';
+                    setSnack({ open: true, message: `Upload cloud gagal: ${msg}${hint ? ' — ' + hint : ''}`, severity: 'error' });
                   }
                 }} />
               </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                Cloud membutuhkan bucket “{landingBucketName}” (Public) di Supabase → Storage.
+              </Typography>
               {imageCloud.length === 0 && imageKeys.length > 0 && (
                 <Button
                   variant="outlined"
@@ -425,10 +432,17 @@ export default function LandingContentEditor() {
                     if (urls.length) setGalleryCloud(prev => [...prev, ...urls]);
                     setSnack({ open: true, message: 'Upload cloud berhasil. Jangan lupa Simpan.', severity: 'success' });
                   } catch (err: any) {
-                    setSnack({ open: true, message: `Upload cloud gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                    const msg = String(err?.message || err?.error?.message || 'Supabase Storage error');
+                    const hint = msg.toLowerCase().includes('bucket not found')
+                      ? `Bucket "${landingBucketName}" belum ada atau tidak public. Buat bucket di Supabase Storage (Public) lalu coba lagi.`
+                      : '';
+                    setSnack({ open: true, message: `Upload cloud gagal: ${msg}${hint ? ' — ' + hint : ''}`, severity: 'error' });
                   }
                 }} />
               </Button>
+              <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
+                Cloud membutuhkan bucket “{landingBucketName}” (Public) di Supabase → Storage.
+              </Typography>
               {galleryCloud.length === 0 && galleryKeys.length > 0 && (
                 <Button
                   variant="outlined"
