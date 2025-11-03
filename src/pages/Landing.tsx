@@ -64,6 +64,12 @@ export default function Landing() {
     let mounted = true;
     (async () => {
       try {
+        // Prefer cloud-hosted URLs if available (cross-device consistent)
+        const cloud = await kvStore.get('landing_images_urls');
+        if (Array.isArray(cloud) && cloud.length) {
+          if (mounted) setImages(cloud as string[]);
+          return;
+        }
         const keys = (await kvStore.get('landing_images_keys')) as string[] | null;
         if (Array.isArray(keys) && keys.length) {
           const urlsMap = await getObjectUrls(keys);
@@ -73,7 +79,15 @@ export default function Landing() {
         }
       } catch { /* ignore */ }
     })();
-    const sub = kvStore.subscribe('landing_images_keys', async (v) => {
+    const sub1 = kvStore.subscribe('landing_images_urls', async (v) => {
+      try {
+        const urls = Array.isArray(v) ? (v as string[]) : [];
+        if (urls.length) {
+          if (mounted) setImages(urls);
+        }
+      } catch {}
+    });
+    const sub2 = kvStore.subscribe('landing_images_keys', async (v) => {
       try {
         const keys = Array.isArray(v) ? v as string[] : [];
         if (keys.length) {
@@ -83,7 +97,7 @@ export default function Landing() {
         }
       } catch {}
     });
-    return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+    return () => { mounted = false; try { sub1.unsubscribe(); sub2.unsubscribe(); } catch {} };
   }, []);
 
   // Previously we redirected authenticated users away from landing.
@@ -131,6 +145,12 @@ export default function Landing() {
     let live = true;
     (async () => {
       try {
+        // Prefer cloud-hosted gallery URLs
+        const cloud = await kvStore.get('landing_gallery_urls');
+        if (Array.isArray(cloud) && cloud.length) {
+          if (live) setGallery(cloud as string[]);
+          return;
+        }
         const keys = (await kvStore.get('landing_gallery_keys')) as string[] | null;
         if (Array.isArray(keys) && keys.length) {
           const urlsMap = await getObjectUrls(keys);
@@ -139,7 +159,17 @@ export default function Landing() {
         }
       } catch {}
     })();
-    const sub = kvStore.subscribe('landing_gallery_keys', async (v) => {
+    const sub1 = kvStore.subscribe('landing_gallery_urls', async (v) => {
+      try {
+        const urls = Array.isArray(v) ? (v as string[]) : [];
+        if (urls.length) {
+          if (live) setGallery(urls);
+        } else if (live) {
+          setGallery(images);
+        }
+      } catch {}
+    });
+    const sub2 = kvStore.subscribe('landing_gallery_keys', async (v) => {
       try {
         const keys = Array.isArray(v) ? (v as string[]) : [];
         if (keys.length) {
@@ -151,7 +181,7 @@ export default function Landing() {
         }
       } catch {}
     });
-    return () => { live = false; try { sub.unsubscribe(); } catch {} };
+    return () => { live = false; try { sub1.unsubscribe(); sub2.unsubscribe(); } catch {} };
   }, []);
   const [socials, setSocials] = useState<typeof SOCIAL_LINKS>(SOCIAL_LINKS);
   useEffect(() => { (async () => { try { const v = await kvStore.get('landing_social_links'); if (v && typeof v === 'object') setSocials(v as any); } catch {} })(); const s = kvStore.subscribe('landing_social_links', (v)=>{ try { if (v && typeof v === 'object') setSocials(v as any); } catch {} }); return () => { try { s.unsubscribe(); } catch {} } }, []);
@@ -264,7 +294,7 @@ export default function Landing() {
 
       {/* Hero + Slider (4:5) */}
       <Box sx={{ position: 'relative', overflow: 'hidden' }}>
-        <Box sx={{ position: 'relative', width: '100%', aspectRatio: '4 / 5' }}>
+        <Box sx={{ position: 'relative', width: '100%', aspectRatio: { xs: '9 / 16', md: '4 / 5' } }}>
           {images.map((src, i) => (
             <Box
               key={src}
@@ -282,14 +312,25 @@ export default function Landing() {
           <Box className="heroGradient" />
           <Box sx={{ position: 'absolute', inset: 0, bgcolor: 'rgba(0,0,0,0.35)' }} />
           <Container sx={{ position: 'relative', zIndex: 1, height: '100%' }}>
-            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', color: 'white' }}>
-              <Typography variant="h3" fontWeight={800} gutterBottom className="gradient-text">
+            <Box sx={{ height: '100%', display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', textAlign: 'center', color: 'white', px: { xs: 1.5, md: 0 } }}>
+              <Typography
+                variant="h3"
+                fontWeight={800}
+                gutterBottom
+                className="gradient-text"
+                sx={{
+                  fontSize: { xs: 'clamp(24px, 6vw, 34px)', md: 'clamp(32px, 3.5vw, 48px)' },
+                  lineHeight: { xs: 1.2, md: 1.15 },
+                  letterSpacing: { xs: 0.2, md: 0.5 },
+                  textShadow: '0 2px 10px rgba(0,0,0,0.35)'
+                }}
+              >
                 {BRAND.tagline}
               </Typography>
-              <Typography variant="h6" sx={{ maxWidth: 720, opacity: 0.95, mx: 'auto' }}>
+              <Typography variant="h6" sx={{ maxWidth: 720, opacity: 0.95, mx: 'auto', fontSize: { xs: '0.95rem', md: '1.1rem' } }}>
                 Sakura Konveksi adalah produsen pakaian custom satuan kualitas premium. Sekarang Kamu bisa PESAN PAKAIAN CUSTOM TANPA MINIMAL ORDER
               </Typography>
-              <Box sx={{ mt: 3, display: 'flex', gap: 1, justifyContent: 'center' }} className="fadeSlide">
+              <Box sx={{ mt: { xs: 2, md: 3 }, display: 'flex', gap: 1, justifyContent: 'center', flexWrap: 'wrap' }} className="fadeSlide">
                 <Button
                   variant="contained"
                   color="primary"

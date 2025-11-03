@@ -27,15 +27,18 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import { LANDING_IMAGES, SOCIAL_LINKS } from '../../lib/landingConfig';
 import kvStore from '../../lib/kvStore';
 import { getObjectUrl, getObjectUrls, saveFiles } from '../../lib/landingStore';
+import { uploadFilesToCloud } from '../../lib/landingRemote';
 
 // Storage keys
 const K = {
   // For large images we only store KEYS (ids) via kvStore; blobs live in IndexedDB
   imagesKeys: 'landing_images_keys',
+  imagesUrls: 'landing_images_urls',
   katalog: 'landing_katalog', // items may contain imageKey
   testimonials: 'landing_testimonials',
   prices: 'landing_prices',
   galleryKeys: 'landing_gallery_keys',
+  galleryUrls: 'landing_gallery_urls',
   socials: 'landing_social_links',
 } as const;
 
@@ -60,6 +63,7 @@ export default function LandingContentEditor() {
   // Slider images: keys persisted; urls resolved for preview
   const [imageKeys, setImageKeys] = useState<string[]>([]);
   const [imageUrls, setImageUrls] = useState<Record<string, string>>({});
+  const [imageCloud, setImageCloud] = useState<string[]>([]);
   // Default images if no keys are set
   const legacyImages = LANDING_IMAGES;
 
@@ -99,6 +103,7 @@ export default function LandingContentEditor() {
   // Gallery
   const [galleryKeys, setGalleryKeys] = useState<string[]>([]);
   const [galleryUrls, setGalleryUrls] = useState<Record<string, string>>({});
+  const [galleryCloud, setGalleryCloud] = useState<string[]>([]);
 
   useEffect(() => {
     let ok = true;
@@ -118,25 +123,29 @@ export default function LandingContentEditor() {
     let mounted = true;
     const hydrate = async () => {
       try {
-        const [ik, kat, test, pr, gk, soc] = await Promise.all([
+        const [ik, kat, test, pr, gk, soc, iu, gu] = await Promise.all([
           kvStore.get(K.imagesKeys),
           kvStore.get(K.katalog),
           kvStore.get(K.testimonials),
           kvStore.get(K.prices),
           kvStore.get(K.galleryKeys),
           kvStore.get(K.socials),
+          kvStore.get(K.imagesUrls),
+          kvStore.get(K.galleryUrls),
         ]);
         if (!mounted) return;
         if (Array.isArray(ik)) setImageKeys(ik as string[]);
+        if (Array.isArray(iu)) setImageCloud(iu as string[]);
         if (Array.isArray(kat)) setKatalog(kat as KatalogItem[]);
         if (Array.isArray(test)) setTestimonials(test as Testimonial[]);
         if (Array.isArray(pr)) setPrices(pr as PriceItem[]);
         if (Array.isArray(gk)) setGalleryKeys(gk as string[]);
+        if (Array.isArray(gu)) setGalleryCloud(gu as string[]);
         if (soc && typeof soc === 'object') setSocials(soc as SocialLinks);
       } catch {}
     };
     hydrate();
-    const subs = [K.imagesKeys, K.katalog, K.testimonials, K.prices, K.galleryKeys, K.socials]
+    const subs = [K.imagesKeys, K.katalog, K.testimonials, K.prices, K.galleryKeys, K.socials, K.imagesUrls, K.galleryUrls]
       .map((key) => kvStore.subscribe(key, () => { try { hydrate(); } catch {} }));
     return () => { mounted = false; subs.forEach(s => { try { s.unsubscribe(); } catch {} }); };
   }, []);
@@ -148,10 +157,12 @@ export default function LandingContentEditor() {
       await Promise.resolve();
       // Persist only keys and structured data; blobs stay in IndexedDB
       try { await kvStore.set(K.imagesKeys, imageKeys); } catch {}
+      try { await kvStore.set(K.imagesUrls, imageCloud); } catch {}
       try { await kvStore.set(K.katalog, katalog); } catch {}
       try { await kvStore.set(K.testimonials, testimonials); } catch {}
       try { await kvStore.set(K.prices, prices); } catch {}
       try { await kvStore.set(K.galleryKeys, galleryKeys); } catch {}
+      try { await kvStore.set(K.galleryUrls, galleryCloud); } catch {}
       try { await kvStore.set(K.socials, socials); } catch {}
       setSnack({ open: true, message: 'Perubahan berhasil disimpan.', severity: 'success' });
     } catch (e) {
@@ -217,7 +228,7 @@ export default function LandingContentEditor() {
         {/* Slider Foto */}
         {tab === 0 && (
           <Box sx={{ p: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
               <Button variant="outlined" startIcon={<UploadIcon />} component="label">
                 Upload Foto
                 <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
@@ -234,23 +245,36 @@ export default function LandingContentEditor() {
                   }
                 }} />
               </Button>
+              <Button variant="contained" startIcon={<UploadIcon />} component="label" color="primary">
+                Upload Foto (Cloud)
+                <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
+                  try {
+                    if (!e.target.files || e.target.files.length === 0) return;
+                    const urls = await uploadFilesToCloud(e.target.files, 'slider');
+                    if (urls.length) setImageCloud(prev => [...prev, ...urls]);
+                    setSnack({ open: true, message: 'Upload cloud berhasil. Jangan lupa Simpan.', severity: 'success' });
+                  } catch (err: any) {
+                    setSnack({ open: true, message: `Upload cloud gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                  }
+                }} />
+              </Button>
             </Stack>
 
-            {(imageKeys.length === 0 && legacyImages.length === 0) ? (
+            {(imageKeys.length === 0 && imageCloud.length === 0 && legacyImages.length === 0) ? (
               <Typography variant="body2" color="text.secondary">Belum ada foto.</Typography>
             ) : (
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
-                {(imageKeys.length ? imageKeys : legacyImages).map((keyOrUrl, idx) => {
-                  const src = imageKeys.length ? (imageUrls[keyOrUrl] || '') : keyOrUrl;
+                {(imageCloud.length ? imageCloud : (imageKeys.length ? imageKeys : legacyImages)).map((keyOrUrl, idx) => {
+                  const src = imageCloud.length ? keyOrUrl : (imageKeys.length ? (imageUrls[keyOrUrl] || '') : keyOrUrl);
                   return (
                   <Card key={`${keyOrUrl}-${idx}`}>
                     <CardMedia component="img" height="160" image={src} alt={`slider-${idx}`} />
                     <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
                       <Box>
-                        <IconButton size="small" onClick={() => imageKeys.length ? setImageKeys(prev => move(prev, idx, -1)) : null} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" onClick={() => imageKeys.length ? setImageKeys(prev => move(prev, idx, 1)) : null} disabled={idx === (imageKeys.length ? imageKeys.length : legacyImages.length) - 1}><ArrowDownwardIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" onClick={() => imageCloud.length ? setImageCloud(prev => move(prev, idx, -1)) : (imageKeys.length ? setImageKeys(prev => move(prev, idx, -1)) : null)} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
+                        <IconButton size="small" onClick={() => imageCloud.length ? setImageCloud(prev => move(prev, idx, 1)) : (imageKeys.length ? setImageKeys(prev => move(prev, idx, 1)) : null)} disabled={idx === ((imageCloud.length ? imageCloud.length : (imageKeys.length ? imageKeys.length : legacyImages.length)) - 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
                       </Box>
-                      <IconButton size="small" color="error" onClick={() => imageKeys.length ? setImageKeys(prev => prev.filter((_, i) => i !== idx)) : null}><DeleteIcon fontSize="small" /></IconButton>
+                      <IconButton size="small" color="error" onClick={() => imageCloud.length ? setImageCloud(prev => prev.filter((_, i) => i !== idx)) : (imageKeys.length ? setImageKeys(prev => prev.filter((_, i) => i !== idx)) : null)}><DeleteIcon fontSize="small" /></IconButton>
                     </CardActions>
                   </Card>
                 );})}
@@ -353,7 +377,7 @@ export default function LandingContentEditor() {
         {/* Galeri */}
         {tab === 4 && (
           <Box sx={{ p: 2 }}>
-            <Stack direction="row" spacing={1} sx={{ mb: 2 }}>
+            <Stack direction="row" spacing={1} sx={{ mb: 2, flexWrap: 'wrap' }}>
               <Button variant="outlined" startIcon={<UploadIcon />} component="label">
                 Upload Foto
                 <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
@@ -369,9 +393,39 @@ export default function LandingContentEditor() {
                   }
                 }} />
               </Button>
+              <Button variant="contained" startIcon={<UploadIcon />} component="label" color="primary">
+                Upload Foto (Cloud)
+                <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
+                  try {
+                    if (!e.target.files || e.target.files.length === 0) return;
+                    const urls = await uploadFilesToCloud(e.target.files, 'gallery');
+                    if (urls.length) setGalleryCloud(prev => [...prev, ...urls]);
+                    setSnack({ open: true, message: 'Upload cloud berhasil. Jangan lupa Simpan.', severity: 'success' });
+                  } catch (err: any) {
+                    setSnack({ open: true, message: `Upload cloud gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                  }
+                }} />
+              </Button>
             </Stack>
             {galleryKeys.length === 0 ? (
-              <Typography variant="body2" color="text.secondary">Belum ada foto.</Typography>
+              (galleryCloud.length === 0 ? (
+                <Typography variant="body2" color="text.secondary">Belum ada foto.</Typography>
+              ) : (
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+                  {galleryCloud.map((url, idx) => (
+                    <Card key={`${url}-${idx}`}>
+                      <CardMedia component="img" height="140" image={url} alt={`galeri-${idx}`} />
+                      <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Box>
+                          <IconButton size="small" onClick={() => setGalleryCloud(prev => move(prev, idx, -1))} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setGalleryCloud(prev => move(prev, idx, 1))} disabled={idx === galleryCloud.length - 1}><ArrowDownwardIcon fontSize="small" /></IconButton>
+                        </Box>
+                        <IconButton size="small" color="error" onClick={() => setGalleryCloud(prev => prev.filter((_, i) => i !== idx))}><DeleteIcon fontSize="small" /></IconButton>
+                      </CardActions>
+                    </Card>
+                  ))}
+                </Box>
+              ))
             ) : (
               <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
                 {galleryKeys.map((key, idx) => (
