@@ -10,13 +10,16 @@ function uuid(): string {
   return Math.random().toString(36).slice(2) + Date.now().toString(36);
 }
 
-export async function uploadFilesToCloud(files: FileList | File[], folder: 'slider' | 'gallery' | 'katalog' = 'slider'): Promise<string[]> {
-  const arr = Array.isArray(files) ? files : Array.from(files);
+export async function uploadFilesToCloud(files: FileList | File[] | Blob[], folder: 'slider' | 'gallery' | 'katalog' = 'slider'): Promise<string[]> {
+  const arr = Array.isArray(files) ? files : Array.from(files as any);
   const urls: string[] = [];
   for (const f of arr) {
-    const ext = (f.name.split('.').pop() || 'jpg').toLowerCase();
+    // File or Blob
+    const name = (f as any).name as string | undefined;
+    const ext = (name ? name.split('.').pop() : undefined) || 'jpg';
     const path = `${folder}/${uuid()}.${ext}`;
-    const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, f, { upsert: false, cacheControl: '3600' });
+  const body = f as Blob; // Supabase accepts Blob/File
+  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, body, { upsert: false, cacheControl: '3600' });
     if (upErr) {
       // stop early on first failure to surface error quickly
       throw upErr;

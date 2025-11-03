@@ -26,7 +26,7 @@ import SaveIcon from '@mui/icons-material/Save';
 import RestoreIcon from '@mui/icons-material/Restore';
 import { LANDING_IMAGES, SOCIAL_LINKS } from '../../lib/landingConfig';
 import kvStore from '../../lib/kvStore';
-import { getObjectUrl, getObjectUrls, saveFiles } from '../../lib/landingStore';
+import { getObjectUrl, getObjectUrls, saveFiles, getBlob } from '../../lib/landingStore';
 import { uploadFilesToCloud } from '../../lib/landingRemote';
 
 // Storage keys
@@ -258,6 +258,29 @@ export default function LandingContentEditor() {
                   }
                 }} />
               </Button>
+              {imageCloud.length === 0 && imageKeys.length > 0 && (
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      // Migrate local IndexedDB blobs to cloud
+                      const blobs: Blob[] = [];
+                      for (const k of imageKeys) {
+                        const b = await getBlob(k);
+                        if (b) blobs.push(b);
+                      }
+                      if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto lokal untuk disinkronkan.', severity: 'info' }); return; }
+                      const urls = await uploadFilesToCloud(blobs, 'slider');
+                      setImageCloud(urls);
+                      setSnack({ open: true, message: 'Sinkronisasi slider ke cloud berhasil. Klik Simpan.', severity: 'success' });
+                    } catch (err: any) {
+                      setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                    }
+                  }}
+                >
+                  Sinkronkan Slider ke Cloud
+                </Button>
+              )}
             </Stack>
 
             {(imageKeys.length === 0 && imageCloud.length === 0 && legacyImages.length === 0) ? (
@@ -406,6 +429,28 @@ export default function LandingContentEditor() {
                   }
                 }} />
               </Button>
+              {galleryCloud.length === 0 && galleryKeys.length > 0 && (
+                <Button
+                  variant="outlined"
+                  onClick={async () => {
+                    try {
+                      const blobs: Blob[] = [];
+                      for (const k of galleryKeys) {
+                        const b = await getBlob(k);
+                        if (b) blobs.push(b);
+                      }
+                      if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto galeri lokal untuk disinkronkan.', severity: 'info' }); return; }
+                      const urls = await uploadFilesToCloud(blobs, 'gallery');
+                      setGalleryCloud(urls);
+                      setSnack({ open: true, message: 'Sinkronisasi galeri ke cloud berhasil. Klik Simpan.', severity: 'success' });
+                    } catch (err: any) {
+                      setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                    }
+                  }}
+                >
+                  Sinkronkan Galeri ke Cloud
+                </Button>
+              )}
             </Stack>
             {galleryKeys.length === 0 ? (
               (galleryCloud.length === 0 ? (
