@@ -282,6 +282,11 @@ const NAVIGATION = [
             segment: 'produksi',
             title: 'Produksi',
             icon: ''
+          },
+          {
+            segment: 'bordir',
+            title: 'Bordir',
+            icon: ''
           }
         ]
       },

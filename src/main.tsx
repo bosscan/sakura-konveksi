@@ -61,6 +61,7 @@ import PengirimanAntrian from './pages/method/update-divisi/antrian/PengirimanAn
 import StockNomorTransaksiAntrian from './pages/method/update-divisi/antrian/StockNomorTransaksiAntrian';
 import TabelProsesDesain from './pages/method/TabelProsesDesain.tsx';
 import TabelProsesProduksi from './pages/method/TabelProsesProduksi.tsx';
+import TabelProsesBordir from './pages/method/TabelProsesBordir.tsx';
 import SpkOnProses from './pages/method/spk-on-proses/SpkOnProses';
 import CekProduksi from './pages/method/cek-produksi/CekProduksi';
 import ListAntrianDesain from './pages/method/desain/ListAntrianDesain';
@@ -280,6 +281,7 @@ const router = createBrowserRouter([
           ,{ path: 'method/spk-on-proses', Component: SpkOnProses }
           ,{ path: 'method/tabel-proses/desain', Component: TabelProsesDesain }
           ,{ path: 'method/tabel-proses/produksi', Component: TabelProsesProduksi }
+          ,{ path: 'method/tabel-proses/bordir', Component: TabelProsesBordir }
           ,{ path: 'method/cek-produksi', Component: CekProduksi }
           ,{ path: 'method/plotting-rekap-bordir', Component: PlottingRekapBordir }
           ,{ path: 'method/list-rekap-bordir', Component: ListRekapBordir }
