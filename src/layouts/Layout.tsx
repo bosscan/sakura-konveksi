@@ -13,16 +13,18 @@ export default function Layout() {
         (async () => {
             try {
                 const isAuth = await kvStore.get(LS_KEYS.IS_AUTH);
+                const user = await kvStore.get(LS_KEYS.SESSION_USER);
                 if (!mounted) return;
-                if (!isAuth) {
+                if (!isAuth || !user) {
                     navigate('/landing');
                 }
             } finally {
                 if (mounted) setChecking(false);
             }
         })();
-        const sub = kvStore.subscribe(LS_KEYS.IS_AUTH, (v) => { if (!v) navigate('/landing'); });
-        return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+        const subA = kvStore.subscribe(LS_KEYS.IS_AUTH, (v) => { if (!v) navigate('/landing'); });
+        const subU = kvStore.subscribe(LS_KEYS.SESSION_USER, (v) => { if (!v) navigate('/landing'); });
+        return () => { mounted = false; try { subA.unsubscribe(); } catch {}; try { subU.unsubscribe(); } catch {} };
     }, [location.pathname, navigate]);
 
     if (checking) return null;
