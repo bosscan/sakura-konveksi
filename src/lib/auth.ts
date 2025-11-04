@@ -67,14 +67,6 @@ export const saveAuth = async (role: Role, username?: string, rememberUsername?:
 
 export const clearAuth = async () => {
   try {
-    // Broadcast logout to same-username sessions (cross-device sign-out)
-    try {
-      const uname = await kvStore.get(LS_KEYS.SESSION_USER);
-      if (typeof uname === 'string' && uname) {
-        const key = `user_logout_${uname}`;
-        await kvStore.set(key, Date.now());
-      }
-    } catch {}
     await kvStore.remove(LS_KEYS.IS_AUTH);
     await kvStore.remove(LS_KEYS.USER_ROLE);
     await kvStore.remove(LS_KEYS.SESSION_USER);

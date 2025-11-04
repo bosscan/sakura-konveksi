@@ -603,8 +603,6 @@ function App() {
   const [session, setSession] = useState({})
   const [role, setRole] = useState<string | undefined>(undefined);
   const [isAuthed, setIsAuthed] = useState<boolean>(false);
-  const [sessionUser, setSessionUser] = useState<string | undefined>(undefined);
-  const [sessionAt, setSessionAt] = useState<number | undefined>(undefined);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [openHomeConfirm, setOpenHomeConfirm] = useState(false);
   const navigate = useNavigate()
@@ -670,18 +668,14 @@ function App() {
     let mounted = true;
     (async () => {
       try {
-        const [authVal, roleVal, userVal, atVal] = await Promise.all([
+        const [authVal, roleVal] = await Promise.all([
           kvStore.get(LS_KEYS.IS_AUTH),
           kvStore.get(LS_KEYS.USER_ROLE),
-          kvStore.get(LS_KEYS.SESSION_USER),
-          kvStore.get(LS_KEYS.SESSION_AT),
         ]);
         if (!mounted) return;
         const authed = !!authVal;
         setIsAuthed(authed);
-        setRole(typeof roleVal === 'string' ? roleVal : undefined);
-        setSessionUser(typeof userVal === 'string' ? userVal : undefined);
-        setSessionAt(typeof atVal === 'number' ? atVal : undefined);
+  setRole(typeof roleVal === 'string' ? roleVal : undefined);
         if (authed) {
           const userData = {}
           setSession({ user: userData })
@@ -694,9 +688,7 @@ function App() {
     })();
     const subR = kvStore.subscribe(LS_KEYS.USER_ROLE, (v) => { try { setRole(typeof v === 'string' ? v : undefined); } catch {} });
     const subA = kvStore.subscribe(LS_KEYS.IS_AUTH, (v) => { try { setIsAuthed(!!v); if (!v) navigate('/landing'); } catch {} });
-    const subU = kvStore.subscribe(LS_KEYS.SESSION_USER, (v) => { try { setSessionUser(typeof v === 'string' ? v : undefined); } catch {} });
-    const subAt = kvStore.subscribe(LS_KEYS.SESSION_AT, (v) => { try { setSessionAt(typeof v === 'number' ? v : undefined); } catch {} });
-    return () => { mounted = false; try { subR.unsubscribe(); } catch {}; try { subA.unsubscribe(); } catch {}; try { subU.unsubscribe(); } catch {}; try { subAt.unsubscribe(); } catch {} };
+    return () => { mounted = false; try { subR.unsubscribe(); } catch {}; try { subA.unsubscribe(); } catch {} };
   }, [])
 
   const authentication = useMemo(() => ({
@@ -713,21 +705,7 @@ function App() {
     }
   }), [])
 
-  // Cross-device logout listener per user
-  useEffect(() => {
-    if (!isAuthed || !sessionUser || !sessionAt) return;
-    const key = `user_logout_${sessionUser}`;
-    const sub = kvStore.subscribe(key, (v) => {
-      try {
-        const ts = typeof v === 'number' ? v : (v ? Number(v) : 0);
-        if (ts && sessionAt && ts >= sessionAt) {
-          // Another device triggered logout
-          (async () => { try { await clearAuth(); } catch {}; setSession({}); setIsAuthed(false); navigate('/landing'); })();
-        }
-      } catch {}
-    });
-    return () => { try { sub.unsubscribe(); } catch {} };
-  }, [isAuthed, sessionUser, sessionAt, navigate]);
+  // Note: per-device logout only (no cross-device sign-out).
 
   return (
     <Box sx={{ display: 'flex', minHeight: '100vh' }} className="app-shell">
