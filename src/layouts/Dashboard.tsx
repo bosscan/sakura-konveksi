@@ -49,6 +49,7 @@ export default function Dashboard() {
     const [plottingCount, setPlottingCount] = useState(0);
     const [spkItems, setSpkItems] = useState<SpkItem[]>([]);
     const [omsetMonth, setOmsetMonth] = useState<Omset[]>([]);
+    const [omsetAccrualMonth, setOmsetAccrualMonth] = useState<Omset[]>([]);
     const [expenseMonth, setExpenseMonth] = useState({
         gaji: [] as Gaji[], belanja: [] as Belanja[], fee: [] as Fee[], ads: [] as Ads[], ongkir: [] as Ongkir[], maint: [] as Maint[], overhead: [] as Overhead[],
     });
@@ -59,7 +60,7 @@ export default function Dashboard() {
         const refresh = async () => {
             if (!mounted) return;
             try {
-                const [dq, ad, k, q, p, ds, om,
+                const [dq, ad, k, q, p, ds, om, omAcc,
                     gajiR, belanjaR, feeR, adsR, ongkirR, maintR, overheadR
                 ] = await Promise.all([
                     kvStore.get('design_queue'),
@@ -69,6 +70,7 @@ export default function Dashboard() {
                     kvStore.get('spk_pipeline'),
                     kvStore.get('spk_design'),
                     kvStore.get('omset_pendapatan'),
+                    kvStore.get('omset_pendapatan_accrual'),
                     kvStore.get('pengeluaran_gaji'),
                     kvStore.get('pengeluaran_belanja_logistik'),
                     kvStore.get('pengeluaran_fee_jaringan'),
@@ -132,6 +134,9 @@ export default function Dashboard() {
                 const omsetAll: Omset[] = Array.isArray(om) ? om as Omset[] : (om ? JSON.parse(String(om)) : []);
                 const monthList = omsetAll.filter((r) => (r?.tanggal || '').startsWith(`${ym}-`));
                 setOmsetMonth(monthList);
+                const omsetAccAll: Omset[] = Array.isArray(omAcc) ? omAcc as Omset[] : (omAcc ? JSON.parse(String(omAcc)) : []);
+                const monthAcc = omsetAccAll.filter((r) => (r?.tanggal || '').startsWith(`${ym}-`));
+                setOmsetAccrualMonth(monthAcc);
 
                 const gaji = (Array.isArray(gajiR) ? gajiR : (gajiR ? JSON.parse(String(gajiR)) : [])) as Gaji[];
                 const belanja = (Array.isArray(belanjaR) ? belanjaR : (belanjaR ? JSON.parse(String(belanjaR)) : [])) as Belanja[];
@@ -151,7 +156,7 @@ export default function Dashboard() {
                 });
                 if (!loaded) setLoaded(true);
             } catch (e) {
-                setDesignQueueCount(0); setAntrianInputCount(0); setKeranjangCount(0); setPlottingCount(0); setSpkItems([]); setOmsetMonth([]);
+                setDesignQueueCount(0); setAntrianInputCount(0); setKeranjangCount(0); setPlottingCount(0); setSpkItems([]); setOmsetMonth([]); setOmsetAccrualMonth([]);
                 setExpenseMonth({ gaji: [], belanja: [], fee: [], ads: [], ongkir: [], maint: [], overhead: [] });
                 if (!loaded) setLoaded(true);
             }
@@ -159,19 +164,19 @@ export default function Dashboard() {
 
         refresh();
         const subs = [
-            'design_queue','antrian_input_desain','keranjang','plotting_rekap_bordir_queue','spk_pipeline','spk_design','omset_pendapatan',
+            'design_queue','antrian_input_desain','keranjang','plotting_rekap_bordir_queue','spk_pipeline','spk_design','omset_pendapatan','omset_pendapatan_accrual',
             'pengeluaran_gaji','pengeluaran_belanja_logistik','pengeluaran_fee_jaringan','pengeluaran_marketing_ads','pengeluaran_ongkir','pengeluaran_maintenance_mesin','pengeluaran_overhead_pabrik'
         ].map((k) => kvStore.subscribe(k, () => { refresh(); }));
         return () => { mounted = false; subs.forEach((s: any) => { try { s.unsubscribe(); } catch {} }); };
     }, [ym]);
 
     // Finance aggregates
-    const totalOmset = useMemo(() => omsetMonth.reduce((a, r) => a + (Number(r.nominal) || 0), 0), [omsetMonth]);
+    const totalOmset = useMemo(() => omsetAccrualMonth.reduce((a, r) => a + (Number(r.nominal) || 0), 0), [omsetAccrualMonth]);
     // Proyeksi Omset (By Trend)
     const projectedOmset = useMemo(() => {
-        if (!omsetMonth.length) return 0;
+        if (!omsetAccrualMonth.length) return 0;
         const perDay = new Map<string, number>();
-        omsetMonth.forEach((r) => {
+        omsetAccrualMonth.forEach((r) => {
             const d = (r.tanggal || '').slice(0, 10);
             if (!d || !d.startsWith(`${ym}-`)) return;
             perDay.set(d, (perDay.get(d) || 0) + (Number(r.nominal) || 0));
@@ -189,7 +194,7 @@ export default function Dashboard() {
         }
         const avg = sumElapsed / elapsedDays;
         return Math.round(avg * daysInMonth);
-    }, [omsetMonth, ym]);
+    }, [omsetAccrualMonth, ym]);
 
     // Average Omset per Day (month-to-date)
     const avgOmsetPerDay = useMemo(() => {
@@ -198,7 +203,7 @@ export default function Dashboard() {
         const month = today.getMonth();
         const dayOfMonth = today.getDate();
         const perDay = new Map<string, number>();
-        omsetMonth.forEach((r) => {
+        omsetAccrualMonth.forEach((r) => {
             const d = (r.tanggal || '').slice(0, 10);
             if (!d || !d.startsWith(`${ym}-`)) return;
             perDay.set(d, (perDay.get(d) || 0) + (Number(r.nominal) || 0));
@@ -214,7 +219,7 @@ export default function Dashboard() {
         }
         if (workingDaysElapsed <= 0) return 0;
         return Math.round(sumElapsed / workingDaysElapsed);
-    }, [omsetMonth, ym]);
+    }, [omsetAccrualMonth, ym]);
 
     // Product classification prioritizing structured jenisProduk/jenisPola from Input Desain
             const productNames: string[] = [
