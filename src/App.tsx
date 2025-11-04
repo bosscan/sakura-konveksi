@@ -602,6 +602,7 @@ const NAVIGATION = [
 function App() {
   const [session, setSession] = useState({})
   const [role, setRole] = useState<string | undefined>(undefined);
+  const [isAuthed, setIsAuthed] = useState<boolean>(false);
     const [expandedItems, setExpandedItems] = useState<Record<string, boolean>>({});
   const [openHomeConfirm, setOpenHomeConfirm] = useState(false);
   const navigate = useNavigate()
@@ -636,9 +637,11 @@ function App() {
   // Filter navigation based on role stored in kvStore
   const navigationFiltered = useMemo(() => {
     try {
+      // If not authenticated, hide all app menus
+      if (!isAuthed) return [] as any[];
       const currentRole = role as any;
-      // management should see everything
-      if (!currentRole) return navigationWithExpanded;
+      // If role missing, also hide menus (no implicit full access)
+      if (!currentRole) return [] as any[];
       const allowed = allowedMenusForRole(currentRole);
 
       const mapSegment = (segment: string) => {
@@ -659,7 +662,7 @@ function App() {
     } catch {
       return navigationWithExpanded;
     }
-  }, [navigationWithExpanded]);
+  }, [navigationWithExpanded, isAuthed, role]);
 
   useEffect(() => {
     let mounted = true;
@@ -671,6 +674,7 @@ function App() {
         ]);
         if (!mounted) return;
         const authed = !!authVal;
+        setIsAuthed(authed);
         setRole(typeof roleVal === 'string' ? roleVal : undefined);
         if (authed) {
           const userData = {}
@@ -683,7 +687,8 @@ function App() {
       }
     })();
     const subR = kvStore.subscribe(LS_KEYS.USER_ROLE, (v) => { try { setRole(typeof v === 'string' ? v : undefined); } catch {} });
-    return () => { mounted = false; try { subR.unsubscribe(); } catch {} };
+    const subA = kvStore.subscribe(LS_KEYS.IS_AUTH, (v) => { try { setIsAuthed(!!v); if (!v) navigate('/landing'); } catch {} });
+    return () => { mounted = false; try { subR.unsubscribe(); } catch {}; try { subA.unsubscribe(); } catch {} };
   }, [])
 
   const authentication = useMemo(() => ({
@@ -694,6 +699,7 @@ function App() {
     signOut: async () => {
       try { await clearAuth(); } catch {}
       setSession({})
+      setIsAuthed(false);
       // Redirect to public landing after sign out
       navigate('/landing')
     }
