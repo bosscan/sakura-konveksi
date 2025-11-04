@@ -48,6 +48,8 @@ function InputPesanan() {
     // data transaksi
     const [transaction, setTransaction] = useState('')
     const [nominal, setNominal] = useState('')
+    // tambahan: nominal barang total (untuk accrual)
+    const [nominalBarangTotal, setNominalBarangTotal] = useState('')
     const [proof, setProof] = useState<string | null>(null); // bukti transaksi
 
     // Generator ID SPK 7 digit (1000001, 1000002, ...)
@@ -200,6 +202,7 @@ function InputPesanan() {
             region_village: village,
             notes: content,
             nominal: amount,
+            nominal_barang_total: Number(String(nominalBarangTotal || '').replace(/[^\d.-]/g, '')) || 0,
             items: items.map(it => ({ size: it.size, nama: it.nama, format_nama: it.formatNama })),
         });
         idSpk = String(orderRes.id_spk || '');
@@ -222,6 +225,7 @@ function InputPesanan() {
             content,
             items,
             nominal,
+            nominalBarangTotal,
             proof,
         };
     list.push(payload);
@@ -238,6 +242,18 @@ function InputPesanan() {
         } else {
             setSnack({ open: true, message: 'Pesanan disimpan ke Antrian Input Desain', severity: 'success' });
         }
+
+        // catat OMSET ACCRUAL dari nominal barang total
+        try {
+            const accrual = Number(String(nominalBarangTotal || '').replace(/[^\d.-]/g, '')) || 0;
+            if (accrual > 0) {
+                const accKey = 'omset_pendapatan_accrual';
+                let accList: any[] = [];
+                try { const r = await kvStore.get(accKey); accList = Array.isArray(r) ? r : (r ? JSON.parse(String(r)) : []); } catch { accList = []; }
+                accList.push({ id: `OMSET-ACC-${Date.now()}`, idSpk, tanggal: new Date().toISOString(), namaPemesan: name, tipeTransaksi: transaction || '-', nominal: accrual });
+                try { await kvStore.set(accKey, accList); } catch {}
+            }
+        } catch {}
 
         // 1) Tulis ke Database Konsumen
         try {
@@ -627,6 +643,17 @@ function InputPesanan() {
                         }}>
                             <Typography variant='body1' sx={{ mr: 1 }}>Nominal Transaksi:</Typography>
                             <TextField fullWidth size='small' value={nominal} onChange={(e) => setNominal(e.target.value)} />
+                        </Box>
+                    </Grid>
+                    <Grid size={{ xs: 12, md: 6 }}>
+                        <Box sx={{
+                            display: 'flex',
+                            alignItems: { xs: 'stretch', md: 'center' },
+                            flexDirection: { xs: 'column', md: 'row' },
+                            gap: 1,
+                        }}>
+                            <Typography variant='body1' sx={{ mr: 1 }}>Nominal Barang Total:</Typography>
+                            <TextField fullWidth size='small' value={nominalBarangTotal} onChange={(e) => setNominalBarangTotal(e.target.value)} />
                         </Box>
                     </Grid>
                     <Grid size={{ xs: 12, md: 3 }}>

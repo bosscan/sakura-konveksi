@@ -359,6 +359,11 @@ const NAVIGATION = [
             title: 'Omset Kumulatif',
             icon: ''
           },
+          {
+            segment: 'omset-accrual-kumulatif',
+            title: 'Omset Accrual Kumulatif',
+            icon: ''
+          },
         ]
       },
       {

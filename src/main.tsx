@@ -42,7 +42,7 @@ import Logistik5Report from './pages/material/report-stock/Logistik5';
 import DatabaseLogistik from './pages/material/DatabaseLogistik';
 import DatabasePola from './pages/material/DatabasePola';
 import HppLogistikPola from './pages/material/HppLogistikPola';
-import { OmsetHarian, OmsetTanggal, OmsetJam, OmsetKumulatif } from './pages/money/pendapatan';
+import { OmsetHarian, OmsetTanggal, OmsetJam, OmsetKumulatif, OmsetAccrualKumulatif } from './pages/money/pendapatan';
 import { Konsolidasi } from './pages/money/konsolidasi';
 import { GajiInput, GajiReport, BelanjaInput, BelanjaReport, FeeJaringan, FeeJaringanReport, MarketingAds, MarketingAdsReport, Ongkir, OngkirReport, PengeluaranKumulatif, MaintenanceInput, MaintenanceReport, OverheadInput, OverheadReport } from './pages/money/pengeluaran';
 import PraProduksiAntrian from './pages/method/update-divisi/PraProduksiAntrian';
@@ -126,6 +126,7 @@ try {
       'database_trend',
       'database_sebaran',
       'omset_pendapatan',
+      'omset_pendapatan_accrual',
       'current_spk_context',
       'pelunasan_transaksi',
     ];
@@ -317,6 +318,7 @@ const router = createBrowserRouter([
             ,{ path: 'money/pendapatan/omset-jam', Component: OmsetJam }
             ,{ path: 'money/pendapatan/omset-kumulatif', Component: OmsetKumulatif }
             ,{ path: 'money/pendapatan/omset-kumulatif/omset-report', Component: OmsetKumulatif }
+            ,{ path: 'money/pendapatan/omset-accrual-kumulatif', Component: OmsetAccrualKumulatif }
             // Money - Konsolidasi
             ,{ path: 'money/konsolidasi/summary', Component: Konsolidasi }
             // Money - Pengeluaran
