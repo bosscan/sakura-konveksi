@@ -1,6 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Box, Button, Dialog, DialogActions, DialogContent, DialogTitle } from '@mui/material';
 import CameraAltIcon from '@mui/icons-material/CameraAlt';
+// Fallback cross-browser decoder (works on iOS/Safari & desktop)
+let ZXingBrowser: any = null;
+try {
+  // Lazy require to avoid increasing initial bundle if not needed
+  ZXingBrowser = await import(/* @vite-ignore */ '@zxing/browser');
+} catch {}
 
 // Lightweight camera-based barcode/QR scanner using the Web Barcode Detector API.
 // Falls back to manual entry if the API or camera is not available.
@@ -21,11 +27,13 @@ export default function BarcodeScanButton({ onDetected, label = 'Scan', size = '
   const streamRef = useRef<MediaStream | null>(null);
   const rafRef = useRef<number | null>(null);
   const detectorRef = useRef<any>(null);
+  const zxingReaderRef = useRef<any>(null);
 
   const stop = useCallback(() => {
     if (rafRef.current) { cancelAnimationFrame(rafRef.current); rafRef.current = null; }
     const s = streamRef.current; streamRef.current = null;
     if (s) s.getTracks().forEach((t) => t.stop());
+    try { zxingReaderRef.current?.reset?.(); } catch {}
   }, []);
 
   const close = useCallback(() => { setOpen(false); }, []);
@@ -54,7 +62,25 @@ export default function BarcodeScanButton({ onDetected, label = 'Scan', size = '
     try {
       // @ts-ignore
       const Supported = typeof window !== 'undefined' && (window as any).BarcodeDetector;
-      if (!Supported) { setCameraError('Scanner tidak didukung di browser ini. Silakan masukkan ID SPK secara manual.'); return; }
+      if (!Supported) {
+        // Fallback to ZXing continuous decode from video
+        if (!ZXingBrowser) { setCameraError('Scanner tidak didukung di browser ini. Silakan masukkan ID SPK secara manual.'); return; }
+        setTimeout(async () => {
+          try {
+            const { BrowserMultiFormatReader } = ZXingBrowser as any;
+            zxingReaderRef.current = new BrowserMultiFormatReader();
+            await zxingReaderRef.current.decodeFromVideoDevice(undefined, videoRef.current!, (result: any) => {
+              if (result) {
+                const text = String(result.getText ? result.getText() : result.text || '').trim();
+                if (text) { stop(); setOpen(false); onDetected(text); }
+              }
+            });
+          } catch (e) {
+            setCameraError('Tidak bisa mengakses kamera. Pastikan izin kamera diberikan.');
+          }
+        }, 50);
+        return;
+      }
       // @ts-ignore
       const BarcodeDetectorCtor = (window as any).BarcodeDetector;
       const formats = ['qr_code','code_128','code_39','ean_13','ean_8','upc_a','upc_e','itf','codabar','data_matrix','pdf417','aztec'];
