@@ -245,49 +245,30 @@ export default function LandingContentEditor() {
                   }
                 }} />
               </Button>
-              <Button variant="contained" startIcon={<UploadIcon />} component="label" color="primary">
-                Upload Foto (Cloud)
-                <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
-                  try {
-                    if (!e.target.files || e.target.files.length === 0) return;
-                    const urls = await uploadFilesToCloud(e.target.files, 'slider');
-                    if (urls.length) setImageCloud(prev => [...prev, ...urls]);
-                    setSnack({ open: true, message: 'Upload cloud berhasil. Jangan lupa Simpan.', severity: 'success' });
-                  } catch (err: any) {
-                    const msg = String(err?.message || err?.error?.message || 'Supabase Storage error');
-                    const hint = msg.toLowerCase().includes('bucket not found')
-                      ? `Bucket "${landingBucketName}" belum ada atau tidak public. Buat bucket di Supabase Storage (Public) lalu coba lagi.`
-                      : '';
-                    setSnack({ open: true, message: `Upload cloud gagal: ${msg}${hint ? ' — ' + hint : ''}`, severity: 'error' });
-                  }
-                }} />
-              </Button>
               <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                 Cloud membutuhkan bucket “{landingBucketName}” (Public) di Supabase → Storage.
               </Typography>
-              {imageCloud.length === 0 && imageKeys.length > 0 && (
-                <Button
-                  variant="outlined"
-                  onClick={async () => {
-                    try {
-                      // Migrate local IndexedDB blobs to cloud
-                      const blobs: Blob[] = [];
-                      for (const k of imageKeys) {
-                        const b = await getBlob(k);
-                        if (b) blobs.push(b);
-                      }
-                      if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto lokal untuk disinkronkan.', severity: 'info' }); return; }
-                      const urls = await uploadFilesToCloud(blobs, 'slider');
-                      setImageCloud(urls);
-                      setSnack({ open: true, message: 'Sinkronisasi slider ke cloud berhasil. Klik Simpan.', severity: 'success' });
-                    } catch (err: any) {
-                      setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+              <Button
+                variant="outlined"
+                onClick={async () => {
+                  try {
+                    // Migrate local IndexedDB blobs to cloud
+                    const blobs: Blob[] = [];
+                    for (const k of imageKeys) {
+                      const b = await getBlob(k);
+                      if (b) blobs.push(b);
                     }
-                  }}
-                >
-                  Sinkronkan Slider ke Cloud
-                </Button>
-              )}
+                    if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto lokal untuk disinkronkan.', severity: 'info' }); return; }
+                    const urls = await uploadFilesToCloud(blobs, 'slider');
+                    setImageCloud(urls);
+                    setSnack({ open: true, message: 'Sinkronisasi slider ke cloud berhasil. Klik Simpan.', severity: 'success' });
+                  } catch (err: any) {
+                    setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                  }
+                }}
+              >
+                Sinkronkan Slider ke Cloud
+              </Button>
             </Stack>
 
             {(imageKeys.length === 0 && imageCloud.length === 0 && legacyImages.length === 0) ? (
@@ -423,48 +404,29 @@ export default function LandingContentEditor() {
                   }
                 }} />
               </Button>
-              <Button variant="contained" startIcon={<UploadIcon />} component="label" color="primary">
-                Upload Foto (Cloud)
-                <input type="file" accept="image/*" multiple hidden onChange={async (e) => {
-                  try {
-                    if (!e.target.files || e.target.files.length === 0) return;
-                    const urls = await uploadFilesToCloud(e.target.files, 'gallery');
-                    if (urls.length) setGalleryCloud(prev => [...prev, ...urls]);
-                    setSnack({ open: true, message: 'Upload cloud berhasil. Jangan lupa Simpan.', severity: 'success' });
-                  } catch (err: any) {
-                    const msg = String(err?.message || err?.error?.message || 'Supabase Storage error');
-                    const hint = msg.toLowerCase().includes('bucket not found')
-                      ? `Bucket "${landingBucketName}" belum ada atau tidak public. Buat bucket di Supabase Storage (Public) lalu coba lagi.`
-                      : '';
-                    setSnack({ open: true, message: `Upload cloud gagal: ${msg}${hint ? ' — ' + hint : ''}`, severity: 'error' });
-                  }
-                }} />
-              </Button>
               <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
                 Cloud membutuhkan bucket “{landingBucketName}” (Public) di Supabase → Storage.
               </Typography>
-              {galleryCloud.length === 0 && galleryKeys.length > 0 && (
-                <Button
-                  variant="outlined"
-                  onClick={async () => {
-                    try {
-                      const blobs: Blob[] = [];
-                      for (const k of galleryKeys) {
-                        const b = await getBlob(k);
-                        if (b) blobs.push(b);
-                      }
-                      if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto galeri lokal untuk disinkronkan.', severity: 'info' }); return; }
-                      const urls = await uploadFilesToCloud(blobs, 'gallery');
-                      setGalleryCloud(urls);
-                      setSnack({ open: true, message: 'Sinkronisasi galeri ke cloud berhasil. Klik Simpan.', severity: 'success' });
-                    } catch (err: any) {
-                      setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+              <Button
+                variant="outlined"
+                onClick={async () => {
+                  try {
+                    const blobs: Blob[] = [];
+                    for (const k of galleryKeys) {
+                      const b = await getBlob(k);
+                      if (b) blobs.push(b);
                     }
-                  }}
-                >
-                  Sinkronkan Galeri ke Cloud
-                </Button>
-              )}
+                    if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto galeri lokal untuk disinkronkan.', severity: 'info' }); return; }
+                    const urls = await uploadFilesToCloud(blobs, 'gallery');
+                    setGalleryCloud(urls);
+                    setSnack({ open: true, message: 'Sinkronisasi galeri ke cloud berhasil. Klik Simpan.', severity: 'success' });
+                  } catch (err: any) {
+                    setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
+                  }
+                }}
+              >
+                Sinkronkan Galeri ke Cloud
+              </Button>
             </Stack>
             {galleryKeys.length === 0 ? (
               (galleryCloud.length === 0 ? (
