@@ -202,6 +202,19 @@ export default function LandingContentEditor() {
     return copy;
   };
 
+  // Merge arrays without duplicates while preserving existing order
+  const mergeUnique = (prev: string[], next: string[]) => {
+    const out = [...prev];
+    const seen = new Set(prev);
+    for (const val of next) {
+      if (val && !seen.has(val)) {
+        out.push(val);
+        seen.add(val);
+      }
+    }
+    return out;
+  };
+
   return (
     <Container sx={{ py: 3 }}>
       <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', mb: 2 }}>
@@ -260,7 +273,7 @@ export default function LandingContentEditor() {
                     }
                     if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto lokal untuk disinkronkan.', severity: 'info' }); return; }
                     const urls = await uploadFilesToCloud(blobs, 'slider');
-                    setImageCloud(urls);
+                    setImageCloud((prev) => mergeUnique(prev, urls));
                     setSnack({ open: true, message: 'Sinkronisasi slider ke cloud berhasil. Klik Simpan.', severity: 'success' });
                   } catch (err: any) {
                     setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
@@ -454,7 +467,7 @@ export default function LandingContentEditor() {
                     }
                     if (blobs.length === 0) { setSnack({ open: true, message: 'Tidak ada foto galeri lokal untuk disinkronkan.', severity: 'info' }); return; }
                     const urls = await uploadFilesToCloud(blobs, 'gallery');
-                    setGalleryCloud(urls);
+                    setGalleryCloud((prev) => mergeUnique(prev, urls));
                     setSnack({ open: true, message: 'Sinkronisasi galeri ke cloud berhasil. Klik Simpan.', severity: 'success' });
                   } catch (err: any) {
                     setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
