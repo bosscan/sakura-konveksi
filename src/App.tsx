@@ -97,6 +97,11 @@ const NAVIGATION = [
         icon: ''
       },
       {
+        segment: 'cut-off-rekap',
+        title: 'Cut Off Rekap',
+        icon: ''
+      },
+      {
         segment: 'penjualan',
         title: 'Penjualan',
         icon: '',
@@ -303,6 +308,11 @@ const NAVIGATION = [
       {
         segment: 'list-rekap-bordir',
         title: 'List Rekap Bordir',
+        icon: ''
+      },
+      {
+        segment: 'dropping-penjahit',
+        title: 'Dropping Penjahit',
         icon: ''
       },
       {
