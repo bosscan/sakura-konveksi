@@ -271,24 +271,60 @@ export default function LandingContentEditor() {
               </Button>
             </Stack>
 
-            {(imageKeys.length === 0 && imageCloud.length === 0 && legacyImages.length === 0) ? (
+            {(imageKeys.length === 0 && imageCloud.length === 0 && legacyImages.length === 0) && (
               <Typography variant="body2" color="text.secondary">Belum ada foto.</Typography>
-            ) : (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
-                {(imageCloud.length ? imageCloud : (imageKeys.length ? imageKeys : legacyImages)).map((keyOrUrl, idx) => {
-                  const src = imageCloud.length ? keyOrUrl : (imageKeys.length ? (imageUrls[keyOrUrl] || '') : keyOrUrl);
-                  return (
-                  <Card key={`${keyOrUrl}-${idx}`}>
-                    <CardMedia component="img" height="160" image={src} alt={`slider-${idx}`} />
-                    <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Box>
-                        <IconButton size="small" onClick={() => imageCloud.length ? setImageCloud(prev => move(prev, idx, -1)) : (imageKeys.length ? setImageKeys(prev => move(prev, idx, -1)) : null)} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" onClick={() => imageCloud.length ? setImageCloud(prev => move(prev, idx, 1)) : (imageKeys.length ? setImageKeys(prev => move(prev, idx, 1)) : null)} disabled={idx === ((imageCloud.length ? imageCloud.length : (imageKeys.length ? imageKeys.length : legacyImages.length)) - 1)}><ArrowDownwardIcon fontSize="small" /></IconButton>
-                      </Box>
-                      <IconButton size="small" color="error" onClick={() => imageCloud.length ? setImageCloud(prev => prev.filter((_, i) => i !== idx)) : (imageKeys.length ? setImageKeys(prev => prev.filter((_, i) => i !== idx)) : null)}><DeleteIcon fontSize="small" /></IconButton>
-                    </CardActions>
-                  </Card>
-                );})}
+            )}
+
+            {imageCloud.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Foto di Cloud</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+                  {imageCloud.map((url, idx) => (
+                    <Card key={`cloud-${idx}`}>
+                      <CardMedia component="img" height="160" image={url} alt={`slider-cloud-${idx}`} />
+                      <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Box>
+                          <IconButton size="small" onClick={() => setImageCloud(prev => move(prev, idx, -1))} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setImageCloud(prev => move(prev, idx, 1))} disabled={idx === imageCloud.length - 1}><ArrowDownwardIcon fontSize="small" /></IconButton>
+                        </Box>
+                        <IconButton size="small" color="error" onClick={() => setImageCloud(prev => prev.filter((_, i) => i !== idx))}><DeleteIcon fontSize="small" /></IconButton>
+                      </CardActions>
+                    </Card>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {imageKeys.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Belum Disinkronkan (Lokal)</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+                  {imageKeys.map((key, idx) => (
+                    <Card key={`local-${key}-${idx}`}>
+                      <CardMedia component="img" height="160" image={imageUrls[key] || ''} alt={`slider-local-${idx}`} />
+                      <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Box>
+                          <IconButton size="small" onClick={() => setImageKeys(prev => move(prev, idx, -1))} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setImageKeys(prev => move(prev, idx, 1))} disabled={idx === imageKeys.length - 1}><ArrowDownwardIcon fontSize="small" /></IconButton>
+                        </Box>
+                        <IconButton size="small" color="error" onClick={() => setImageKeys(prev => prev.filter((_, i) => i !== idx))}><DeleteIcon fontSize="small" /></IconButton>
+                      </CardActions>
+                    </Card>
+                  ))}
+                </Box>
+              </Box>
+            )}
+
+            {(imageCloud.length === 0 && imageKeys.length === 0 && legacyImages.length > 0) && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Default</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr', sm: '1fr 1fr', md: '1fr 1fr 1fr' }, gap: 2 }}>
+                  {legacyImages.map((url, idx) => (
+                    <Card key={`legacy-${idx}`}>
+                      <CardMedia component="img" height="160" image={url} alt={`slider-default-${idx}`} />
+                    </Card>
+                  ))}
+                </Box>
               </Box>
             )}
           </Box>
@@ -428,14 +464,17 @@ export default function LandingContentEditor() {
                 Sinkronkan Galeri ke Cloud
               </Button>
             </Stack>
-            {galleryKeys.length === 0 ? (
-              (galleryCloud.length === 0 ? (
-                <Typography variant="body2" color="text.secondary">Belum ada foto.</Typography>
-              ) : (
+            {(galleryCloud.length === 0 && galleryKeys.length === 0) && (
+              <Typography variant="body2" color="text.secondary">Belum ada foto.</Typography>
+            )}
+
+            {galleryCloud.length > 0 && (
+              <Box sx={{ mt: 1 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Foto di Cloud</Typography>
                 <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
                   {galleryCloud.map((url, idx) => (
-                    <Card key={`${url}-${idx}`}>
-                      <CardMedia component="img" height="140" image={url} alt={`galeri-${idx}`} />
+                    <Card key={`g-cloud-${idx}`}>
+                      <CardMedia component="img" height="140" image={url} alt={`galeri-cloud-${idx}`} />
                       <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
                         <Box>
                           <IconButton size="small" onClick={() => setGalleryCloud(prev => move(prev, idx, -1))} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
@@ -446,21 +485,26 @@ export default function LandingContentEditor() {
                     </Card>
                   ))}
                 </Box>
-              ))
-            ) : (
-              <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
-                {galleryKeys.map((key, idx) => (
-                  <Card key={`${key}-${idx}`}>
-                    <CardMedia component="img" height="140" image={galleryUrls[key]} alt={`galeri-${idx}`} />
-                    <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <Box>
-                        <IconButton size="small" onClick={() => setGalleryKeys(prev => move(prev, idx, -1))} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
-                        <IconButton size="small" onClick={() => setGalleryKeys(prev => move(prev, idx, 1))} disabled={idx === galleryKeys.length - 1}><ArrowDownwardIcon fontSize="small" /></IconButton>
-                      </Box>
-                      <IconButton size="small" color="error" onClick={() => setGalleryKeys(prev => prev.filter((_, i) => i !== idx))}><DeleteIcon fontSize="small" /></IconButton>
-                    </CardActions>
-                  </Card>
-                ))}
+              </Box>
+            )}
+
+            {galleryKeys.length > 0 && (
+              <Box sx={{ mt: 3 }}>
+                <Typography variant="subtitle2" sx={{ mb: 1 }}>Belum Disinkronkan (Lokal)</Typography>
+                <Box sx={{ display: 'grid', gridTemplateColumns: { xs: '1fr 1fr', md: '1fr 1fr 1fr 1fr' }, gap: 2 }}>
+                  {galleryKeys.map((key, idx) => (
+                    <Card key={`g-local-${key}-${idx}`}>
+                      <CardMedia component="img" height="140" image={galleryUrls[key]} alt={`galeri-local-${idx}`} />
+                      <CardActions sx={{ display: 'flex', justifyContent: 'space-between' }}>
+                        <Box>
+                          <IconButton size="small" onClick={() => setGalleryKeys(prev => move(prev, idx, -1))} disabled={idx === 0}><ArrowUpwardIcon fontSize="small" /></IconButton>
+                          <IconButton size="small" onClick={() => setGalleryKeys(prev => move(prev, idx, 1))} disabled={idx === galleryKeys.length - 1}><ArrowDownwardIcon fontSize="small" /></IconButton>
+                        </Box>
+                        <IconButton size="small" color="error" onClick={() => setGalleryKeys(prev => prev.filter((_, i) => i !== idx))}><DeleteIcon fontSize="small" /></IconButton>
+                      </CardActions>
+                    </Card>
+                  ))}
+                </Box>
               </Box>
             )}
           </Box>
