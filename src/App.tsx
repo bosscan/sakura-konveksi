@@ -660,14 +660,37 @@ function App() {
         return segment;
       };
 
-      // Only filter top-level navigation entries. If a top-level segment is allowed,
-      // keep it and preserve its children (don't re-filter child segments).
-      const result = navigationWithExpanded.filter(it => {
+      // Filter top-level navigation entries first
+      let result = navigationWithExpanded.filter(it => {
         if (it.segment === 'dashboard') return true;
         const seg = mapSegment(it.segment || '');
         return allowed.includes(seg as any);
       });
 
+      // Additional child filtering for specific roles
+      const filterChildrenForRole = (items: any[]): any[] => {
+        if (currentRole !== 'operator_cutting_pola') return items;
+        return items.map((it) => {
+          if (it.segment !== 'method') return it;
+          // Allowed under method for operator cutting pola:
+          // - update-divisi > cutting-pola (all its children)
+          // - spk-on-proses
+          // - tabel-proses (all children: desain/produksi/bordir)
+          const allowedMethodSegments = new Set(['update-divisi', 'spk-on-proses', 'tabel-proses']);
+          const filteredChildren = (it.children || []).filter((c: any) => allowedMethodSegments.has(c.segment));
+
+          // Within update-divisi, keep only 'cutting-pola'
+          const mapped = filteredChildren.map((c: any) => {
+            if (c.segment !== 'update-divisi') return c;
+            const onlyCutting = (c.children || []).filter((d: any) => d.segment === 'cutting-pola');
+            return { ...c, children: onlyCutting };
+          });
+
+          return { ...it, children: mapped };
+        });
+      };
+
+      result = filterChildrenForRole(result);
       return result;
     } catch {
       return navigationWithExpanded;

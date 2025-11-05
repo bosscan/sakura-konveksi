@@ -19,6 +19,7 @@ function Login() {
       { username: 'admin', password: 'admin-sakura', user: 'Admin Produksi', role: 'admin_produksi' },
       { username: 'cs', password: 'cs-sakura', user: 'Customer Service', role: 'cs' },
       { username: 'operator', password: 'operator-sakura', user: 'Marketing', role: 'operator' },
+      { username: 'operator-cutting', password: 'operator-cutting-sakura', user: 'Operator Cutting Pola', role: 'operator_cutting_pola' },
     ];
 
   // restore remembered username from kvStore

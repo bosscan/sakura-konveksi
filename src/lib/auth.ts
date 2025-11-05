@@ -3,6 +3,7 @@ export const ROLE = {
   CS: 'cs',
   ADMIN_PRODUKSI: 'admin_produksi',
   OPERATOR: 'operator',
+  OPERATOR_CUTTING_POLA: 'operator_cutting_pola',
 } as const;
 
 export type Role = typeof ROLE[keyof typeof ROLE];
@@ -27,6 +28,9 @@ export const allowedMenusForRole = (role?: Role): MenuKey[] => {
     case ROLE.ADMIN_PRODUKSI:
       return [MENU.METHOD, MENU.MESIN, MENU.MATERIAL, MENU.MANPOWER];
     case ROLE.OPERATOR:
+      return [MENU.METHOD];
+    case ROLE.OPERATOR_CUTTING_POLA:
+      // Batasi hanya Method (nanti difilter anak menu di App)
       return [MENU.METHOD];
     default:
       return [];
