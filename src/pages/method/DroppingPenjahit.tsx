@@ -1,6 +1,7 @@
 import { Box, Paper, Typography, TextField, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Stack } from '@mui/material';
 import { useEffect, useMemo, useState } from 'react';
 import kvStore from '../../lib/kvStore';
+import BarcodeScanButton from '../../components/BarcodeScanButton';
 
 const KEY = 'penjahit_map'; // idSpk -> namaPenjahit
 
@@ -52,8 +53,17 @@ export default function DroppingPenjahit() {
         <Typography variant="h6" sx={{ fontWeight: 700, textAlign: 'center', mb: 2 }}>
           Dropping Penjahit
         </Typography>
-        <Stack direction={{ xs:'column', sm:'row' }} spacing={2} sx={{ mb: 2 }}>
+        <Stack direction={{ xs:'column', sm:'row' }} spacing={2} sx={{ mb: 2, alignItems: 'center' }}>
           <TextField label="ID SPK" value={idSpk} onChange={(e)=>setIdSpk(e.target.value)} size="small" sx={{ flex: 1 }} />
+          <BarcodeScanButton
+            label="Scan ID SPK"
+            size="small"
+            variant="outlined"
+            onDetected={(code) => {
+              const text = String(code || '').trim();
+              if (text) setIdSpk(text);
+            }}
+          />
           <TextField label="Nama Penjahit" value={nama} onChange={(e)=>setNama(e.target.value)} size="small" sx={{ flex: 1 }} />
           <Button variant="contained" onClick={handleSimpan}>Simpan</Button>
         </Stack>

@@ -13,6 +13,7 @@ type SPKRow = {
     idRekapCustom: string;
     idCustom: string;
     namaDesain: string;
+    namaPenjahit?: string;
     kuantity: number;
     statusDesain: string;
     statusKonten: string;
@@ -240,6 +241,8 @@ export default function ListCPKOnProgress() {
                 const prMap: Record<string, any> = prRaw && typeof prRaw === 'object' ? prRaw : {};
                 const terbitRaw = (await kvStore.get('spk_terbit_map')) || {};
                 const terbitMap: Record<string, string> = terbitRaw && typeof terbitRaw === 'object' ? terbitRaw : {};
+                const penjahitRaw = (await kvStore.get('penjahit_map')) || {};
+                const penjahitMap: Record<string, string> = penjahitRaw && typeof penjahitRaw === 'object' ? penjahitRaw as any : {} as any;
                 const format7 = (v: any) => {
                     const m = String(v || '').match(/(\d{1,})/);
                     return m ? String(Number(m[1])).padStart(7, '0') : '';
@@ -273,6 +276,7 @@ export default function ListCPKOnProgress() {
                         idRekapCustom: it.idRekapCustom || it.idRekap,
                         idCustom: it.idCustom,
                         namaDesain: it.namaDesain,
+                        namaPenjahit: (penjahitMap && penjahitMap[it.idSpk]) ? String(penjahitMap[it.idSpk]) : '-',
                         kuantity: qty || 0,
                         statusDesain: 'Proses',
                         // Konten from Input Pesanan with robust fallbacks like PrintSPK
@@ -321,7 +325,8 @@ export default function ListCPKOnProgress() {
             'antrian_input_desain',
             'spk_orders',
             'keranjang',
-            'spk_terbit_map'
+            'spk_terbit_map',
+            'penjahit_map'
         ];
         const subs = keysToWatch.map((k) => kvStore.subscribe(k, () => { try { refresh(); } catch {} }));
         refresh();
@@ -396,7 +401,7 @@ export default function ListCPKOnProgress() {
                     </Stack>
                 </Box>
                 <TableContainer component={Paper} sx={{ width: '100%', overflowX: 'auto' }}>
-                    <Table sx={{ minWidth: 3200 }} aria-label="spk-on-proses-table" ref={tableRef}>
+                    <Table sx={{ minWidth: 3350 }} aria-label="spk-on-proses-table" ref={tableRef}>
                         <TableHead sx={{
                             '& .MuiTableCell-head': {
                                 whiteSpace: 'normal',
@@ -417,6 +422,7 @@ export default function ListCPKOnProgress() {
                                 <TableCell>ID REKAP CUSTOM</TableCell>
                                 <TableCell>ID CUSTOM</TableCell>
                                 <TableCell>NAMA DESAIN</TableCell>
+                                <TableCell>NAMA PENJAHIT</TableCell>
                                 <TableCell>KUANTITY</TableCell>
                                 <TableCell>STATUS DESAIN</TableCell>
                                 <TableCell>STATUS PESANAN</TableCell>
@@ -463,6 +469,7 @@ export default function ListCPKOnProgress() {
                                     <TableCell>{row.idRekapCustom}</TableCell>
                                     <TableCell>{row.idCustom}</TableCell>
                                     <TableCell>{row.namaDesain}</TableCell>
+                                    <TableCell>{row.namaPenjahit || '-'}</TableCell>
                                     <TableCell>{row.kuantity}</TableCell>
                                     <TableCell>{row.statusDesain}</TableCell>
                                     <TableCell>{getStatusPesanan(row)}</TableCell>
