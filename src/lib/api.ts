@@ -1,4 +1,4 @@
-import { supabase } from './supabaseClient';
+// All API calls use the custom backend via HTTP.
 
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 
@@ -28,14 +28,8 @@ export const Api = {
     return http('/api/plotting-queue/');
   },
   async postCheckout(payload: { idTransaksi?: string; items: Array<{ idSpk: string; idRekapCustom?: string; idCustom?: string; namaDesain?: string; kuantity?: number; }> }) {
-    // Prefer Supabase RPC if available; fallback to existing HTTP endpoint for compatibility
-    try {
-      const { data, error } = await supabase.rpc('checkout_cart', { p_items: payload.items });
-      if (error) throw error;
-      return data;
-    } catch {
-      return http('/api/plotting-queue/checkout/', { method: 'POST', body: JSON.stringify(payload) });
-    }
+  // Previously used DB-side RPC (checkout_cart); now direct backend endpoint only.
+    return http('/api/plotting-queue/checkout/', { method: 'POST', body: JSON.stringify(payload) });
   },
 
   // Rekap Bordir

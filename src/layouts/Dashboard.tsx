@@ -14,6 +14,21 @@ import {
     CartesianGrid,
 } from 'recharts';
 import kvStore from '../lib/kvStore';
+import { LS_KEYS, ROLE, type Role } from '../lib/auth';
+import CuttingPolaAntrian from '../pages/method/update-divisi/antrian/CuttingPolaAntrian';
+import ProduksiAntrian from '../pages/method/update-divisi/antrian/ProduksiAntrian';
+import StockBordirAntrian from '../pages/method/update-divisi/antrian/StockBordirAntrian';
+import BordirAntrian from '../pages/method/update-divisi/antrian/BordirAntrian';
+import SettingAntrian from '../pages/method/update-divisi/antrian/SettingAntrian';
+import StockJahitAntrian from '../pages/method/update-divisi/antrian/StockJahitAntrian';
+import JahitAntrian from '../pages/method/update-divisi/antrian/JahitAntrian';
+import FinishingAntrian from '../pages/method/update-divisi/antrian/FinishingAntrian';
+import FotoProdukAntrian from '../pages/method/update-divisi/antrian/FotoProdukAntrian';
+import StockNomorTransaksiAntrian from '../pages/method/update-divisi/antrian/StockNomorTransaksiAntrian';
+import PengirimanAntrian from '../pages/method/update-divisi/antrian/PengirimanAntrian';
+import AntrianPengerjaanDesain from '../pages/method/desain/AntrianPengerjaanDesain';
+import TabelProsesDesain from '../pages/method/TabelProsesDesain';
+import TabelProsesProduksi from '../pages/method/TabelProsesProduksi';
 
 type Omset = { id: string; idSpk?: string; tanggal: string; namaPemesan?: string; tipeTransaksi?: string; nominal: number };
 type Gaji = { date: string; base: number; overtime: number; bonus: number; deduction: number };
@@ -42,6 +57,7 @@ const currency = (n: number) => `Rp ${n.toLocaleString('id-ID')}`;
 export default function Dashboard() {
     const now = new Date();
     const ym = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const [role, setRole] = useState<Role | undefined>(undefined);
 
     const [designQueueCount, setDesignQueueCount] = useState(0); // pra produksi desain (active statuses)
     const [antrianInputCount, setAntrianInputCount] = useState(0);
@@ -60,6 +76,11 @@ export default function Dashboard() {
         const refresh = async () => {
             if (!mounted) return;
             try {
+                // role session
+                try {
+                    const r = await kvStore.get(LS_KEYS.USER_ROLE);
+                    if (mounted) setRole((r as Role) || undefined);
+                } catch {}
                 const [dq, ad, k, q, p, ds, om, omAcc,
                     gajiR, belanjaR, feeR, adsR, ongkirR, maintR, overheadR
                 ] = await Promise.all([
@@ -164,9 +185,10 @@ export default function Dashboard() {
 
         refresh();
         const subs = [
+            kvStore.subscribe(LS_KEYS.USER_ROLE, () => { try { (async () => setRole((await kvStore.get(LS_KEYS.USER_ROLE)) as Role))(); } catch {} }),
             'design_queue','antrian_input_desain','keranjang','plotting_rekap_bordir_queue','spk_pipeline','spk_design','omset_pendapatan','omset_pendapatan_accrual',
             'pengeluaran_gaji','pengeluaran_belanja_logistik','pengeluaran_fee_jaringan','pengeluaran_marketing_ads','pengeluaran_ongkir','pengeluaran_maintenance_mesin','pengeluaran_overhead_pabrik'
-        ].map((k) => kvStore.subscribe(k, () => { refresh(); }));
+        ].map((k) => typeof k === 'string' ? kvStore.subscribe(k, () => { refresh(); }) : k);
         return () => { mounted = false; subs.forEach((s: any) => { try { s.unsubscribe(); } catch {} }); };
     }, [ym]);
 
@@ -329,6 +351,206 @@ export default function Dashboard() {
         });
         return Array.from(map.values()).sort((a, b) => a.date.localeCompare(b.date));
     }, [omsetMonth, expenseMonth]);
+
+    // Role-specific dashboards for operator roles
+    if (role === ROLE.OPERATOR_DESAINER_PRA_PRODUKSI) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Desainer Pra Produksi</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <AntrianPengerjaanDesain />
+                    </Paper>
+                </Box>
+                <Box>
+                    <Paper sx={{ p: 0 }}>
+                        <TabelProsesDesain />
+                    </Paper>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_DESAINER_PRODUKSI) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Desainer Produksi</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <ProduksiAntrian />
+                    </Paper>
+                </Box>
+                <Box>
+                    <Paper sx={{ p: 0 }}>
+                        <TabelProsesProduksi />
+                    </Paper>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_CUTTING_POLA) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Cutting Pola</Typography>
+                {/* Focus widgets for operator: Cutting Pola queue and process table */}
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <CuttingPolaAntrian />
+                    </Paper>
+                </Box>
+                <Box>
+                    <Paper sx={{ p: 0 }}>
+                        <TabelProsesProduksi />
+                    </Paper>
+                </Box>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_STOCK_BORDIR) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Stock Bordir</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <StockBordirAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_BORDIR) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Bordir</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <BordirAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_SETTING) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Setting</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <SettingAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_STOCK_JAHIT) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Stock Jahit</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <StockJahitAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_JAHIT) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Jahit</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <JahitAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_FINISHING) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Finishing</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <FinishingAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_FOTO_PRODUK) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Foto Produk</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <FotoProdukAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_STOCK_NOMOR_TRANSAKSI) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Stock Nomor Transaksi</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <StockNomorTransaksiAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
+
+    if (role === ROLE.OPERATOR_PENGIRIMAN) {
+        return (
+            <Box sx={{ p: 3 }}>
+                <Typography variant="h6" fontWeight={700} sx={{ mb: 2 }}>Dashboard · Operator Pengiriman</Typography>
+                <Box sx={{ mb: 2 }}>
+                    <Paper sx={{ p: 0 }}>
+                        <PengirimanAntrian />
+                    </Paper>
+                </Box>
+                <Paper sx={{ p: 0 }}>
+                    <TabelProsesProduksi />
+                </Paper>
+            </Box>
+        );
+    }
 
     return (
         <Box sx={{ p: 3 }}>

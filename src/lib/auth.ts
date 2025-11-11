@@ -4,6 +4,17 @@ export const ROLE = {
   ADMIN_PRODUKSI: 'admin_produksi',
   OPERATOR: 'operator',
   OPERATOR_CUTTING_POLA: 'operator_cutting_pola',
+  OPERATOR_DESAINER_PRA_PRODUKSI: 'operator_desainer_pra_produksi',
+  OPERATOR_DESAINER_PRODUKSI: 'operator_desainer_produksi',
+  OPERATOR_STOCK_BORDIR: 'operator_stock_bordir',
+  OPERATOR_BORDIR: 'operator_bordir',
+  OPERATOR_SETTING: 'operator_setting',
+  OPERATOR_STOCK_JAHIT: 'operator_stock_jahit',
+  OPERATOR_JAHIT: 'operator_jahit',
+  OPERATOR_FINISHING: 'operator_finishing',
+  OPERATOR_FOTO_PRODUK: 'operator_foto_produk',
+  OPERATOR_STOCK_NOMOR_TRANSAKSI: 'operator_stock_nomor_transaksi',
+  OPERATOR_PENGIRIMAN: 'operator_pengiriman',
 } as const;
 
 export type Role = typeof ROLE[keyof typeof ROLE];
@@ -31,6 +42,18 @@ export const allowedMenusForRole = (role?: Role): MenuKey[] => {
       return [MENU.METHOD];
     case ROLE.OPERATOR_CUTTING_POLA:
       // Batasi hanya Method (nanti difilter anak menu di App)
+      return [MENU.METHOD];
+    case ROLE.OPERATOR_DESAINER_PRA_PRODUKSI:
+    case ROLE.OPERATOR_DESAINER_PRODUKSI:
+    case ROLE.OPERATOR_STOCK_BORDIR:
+    case ROLE.OPERATOR_BORDIR:
+    case ROLE.OPERATOR_SETTING:
+    case ROLE.OPERATOR_STOCK_JAHIT:
+    case ROLE.OPERATOR_JAHIT:
+    case ROLE.OPERATOR_FINISHING:
+    case ROLE.OPERATOR_FOTO_PRODUK:
+    case ROLE.OPERATOR_STOCK_NOMOR_TRANSAKSI:
+    case ROLE.OPERATOR_PENGIRIMAN:
       return [MENU.METHOD];
     default:
       return [];

@@ -4,7 +4,7 @@ import kvStore from './kvStore';
 /**
  * React hook for kvStore with cache-first behavior and a loading flag.
  * - Immediately serves last-known-good value from in-memory cache (kvStore.peek)
- * - Then hydrates from Supabase via kvStore.get
+ * - Then hydrates from backend via kvStore.get
  * - Keeps value in sync via kvStore.subscribe
  */
 export function useKV<T = any>(key: string, initial?: T) {
