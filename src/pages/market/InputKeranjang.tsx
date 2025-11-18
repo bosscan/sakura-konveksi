@@ -12,7 +12,7 @@ import {
     Modal,
     Checkbox
 } from "@mui/material";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Api from "../../lib/api";
 import kvStore from '../../lib/kvStore';
 import DeleteIcon from '@mui/icons-material/Delete';
@@ -165,6 +165,10 @@ function CheckoutModal({
 
 export default function Keranjang() {
     const [rows, setRows] = useState<KeranjangRow[]>([]);
+    // Maintain selection separately to survive refresh() data replacements
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+    const selectedIdsRef = useRef<Set<string>>(selectedIds);
+    useEffect(() => { selectedIdsRef.current = selectedIds; }, [selectedIds]);
     useEffect(() => {
         let mounted = true;
         const refresh = async () => {
@@ -188,12 +192,12 @@ export default function Keranjang() {
                     });
                     if (JSON.stringify(enriched) !== JSON.stringify(cart)) {
                         try { await kvStore.set('keranjang', enriched); } catch {}
-                        if (mounted) setRows(enriched);
+                        if (mounted) setRows(enriched.map((r: any) => ({ ...r, selected: selectedIdsRef.current.has(r.idRekap) })));
                         return;
                     }
-                    if (mounted) setRows(cart);
+                    if (mounted) setRows(cart.map((r: any) => ({ ...r, selected: selectedIdsRef.current.has(r.idRekap) })));
                 } catch {
-                    if (mounted) setRows(cart);
+                    if (mounted) setRows(cart.map((r: any) => ({ ...r, selected: selectedIdsRef.current.has(r.idRekap) })));
                 }
             } catch {
                 if (mounted) setRows([]);
@@ -211,19 +215,25 @@ export default function Keranjang() {
     const [openCheckout, setOpenCheckout] = useState(false);
 
     const toggleSelect = (idRekap: string) => {
-        setRows(rows.map(row => 
-            row.idRekap === idRekap 
-                ? { ...row, selected: !row.selected } 
-                : row
-        ));
+        setSelectedIds(prev => {
+            const next = new Set(prev);
+            if (next.has(idRekap)) next.delete(idRekap); else next.add(idRekap);
+            return next;
+        });
     };
 
     const toggleSelectAll = (event: React.ChangeEvent<HTMLInputElement>) => {
-        setRows(rows.map(row => ({
-            ...row,
-            selected: event.target.checked
-        })));
+        if (event.target.checked) {
+            setSelectedIds(new Set(rows.map(r => r.idRekap)));
+        } else {
+            setSelectedIds(new Set());
+        }
     };
+
+    // Reconcile row.selected flags whenever selectedIds changes
+    useEffect(() => {
+        setRows(prev => prev.map(r => ({ ...r, selected: selectedIds.has(r.idRekap) })));
+    }, [selectedIds]);
 
     const handleCheckout = () => {
         setOpenCheckout(true);
@@ -232,7 +242,7 @@ export default function Keranjang() {
     const persist = async (data: KeranjangRow[]) => { try { await kvStore.set('keranjang', data); } catch {} };
     const handleConfirmCheckout = async () => {
         // 1) Collect selected items to checkout
-        const toCheckout = rows.filter(r => r.selected);
+    const toCheckout = rows.filter(r => selectedIds.has(r.idRekap));
         if (toCheckout.length > 0) {
             try {
                 // 2) Generate a single 7-digit idTransaksi for this checkout batch
@@ -330,21 +340,22 @@ export default function Keranjang() {
         }
 
         // 7) Remove selected items from keranjang as before
-        const updatedRows = rows.filter(row => !row.selected);
+        const updatedRows = rows.filter(row => !selectedIds.has(row.idRekap));
         setRows(updatedRows);
         persist(updatedRows);
-    setOpenCheckout(false);
+        setSelectedIds(new Set());
+        setOpenCheckout(false);
     };
 
     const handleDeleteSelected = () => {
-        const updatedRows = rows.filter(row => !row.selected);
+        const updatedRows = rows.filter(row => !selectedIds.has(row.idRekap));
         setRows(updatedRows);
         persist(updatedRows);
+        setSelectedIds(new Set());
     };
 
     // Hitung total nominal dan jumlah item yang dipilih
-    const selectedRows = rows.filter(row => row.selected);
-    const selectedCount = selectedRows.length;
+    const selectedCount = selectedIds.size;
 
     return (
         <Box sx={{
@@ -413,7 +424,7 @@ export default function Keranjang() {
                         </TableHead>
                         <TableBody>
                             {rows.map((row, index) => (
-                                <TableRow key={index} selected={row.selected}>
+                                <TableRow key={row.idRekap || index} selected={row.selected}>
                                     <TableCell padding="checkbox">
                                         <Checkbox
                                             checked={row.selected || false}
