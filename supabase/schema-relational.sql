@@ -2,16 +2,6 @@
 -- Safe to run multiple times (create if not exists / drop-if-exists for policies/triggers only).
 
 begin;
--- =========================
--- 0) Utility KV table (used by frontend kvStore)
--- =========================
-
-create table if not exists public.kv_store (
-  key text primary key,
-  value jsonb,
-  updated_at timestamptz not null default timezone('utc', now())
-);
-
 
 -- Extensions commonly available on Supabase
 create extension if not exists pgcrypto;       -- for gen_random_uuid()
@@ -307,13 +297,6 @@ create table if not exists public.rekap_bordir_items (
 );
 create index if not exists rb_items_rekap_idx on public.rekap_bordir_items (rekap_bordir_id);
 create index if not exists rb_items_order_idx on public.rekap_bordir_items (order_id);
-
--- Mapping for penjahit assignment per SPK (frontend: penjahit_map)
-create table if not exists public.penjahit_assignments (
-  order_id char(7) primary key references public.orders(id_spk) on delete cascade,
-  penjahit_name text,
-  updated_at timestamptz not null default timezone('utc', now())
-);
 
 -- =========================
 -- 3b) Urgent SPK
@@ -865,8 +848,6 @@ alter table public.cart_items enable row level security;
 alter table public.spk_revisions enable row level security;
 alter table public.pattern_hpp enable row level security;
 alter table public.pattern_hpp_items enable row level security;
-alter table public.kv_store enable row level security;
-alter table public.penjahit_assignments enable row level security;
 
 -- Drop policies if they exist (to re-apply idempotently)
 do $$
@@ -875,7 +856,7 @@ begin
   for r in (
     select schemaname, tablename from pg_tables where schemaname='public'
       and tablename in (
-        'customers','logistics_master','patterns_master','landing_sections','landing_media','orders','order_items','design_queue','design_snapshots','order_snapshots','product_catalog','product_media','transactions','production_recap','order_recap','pipeline','pipeline_history','plotting_queue','rekap_bordir','rekap_bordir_items','spk_urgent','invoices','invoice_rows','revenues','payments','expenses','prognosis_entries','material_stock','employees','attendance_logs','employee_performance','employee_rejects','machines','machine_maintenance_logs','carts','cart_items','spk_revisions','pattern_hpp','pattern_hpp_items','kv_store','penjahit_assignments'
+        'customers','logistics_master','patterns_master','landing_sections','landing_media','orders','order_items','design_queue','design_snapshots','order_snapshots','product_catalog','product_media','transactions','production_recap','order_recap','pipeline','pipeline_history','plotting_queue','rekap_bordir','rekap_bordir_items','spk_urgent','invoices','invoice_rows','revenues','payments','expenses','prognosis_entries','material_stock','employees','attendance_logs','employee_performance','employee_rejects','machines','machine_maintenance_logs','carts','cart_items','spk_revisions','pattern_hpp','pattern_hpp_items'
       )
   ) loop
     -- Drop previously created policy names to keep script idempotent
@@ -912,8 +893,8 @@ declare r record;
 begin
   for r in (
     select unnest(array[
-        'customers','logistics_master','patterns_master','landing_sections','landing_media','orders','order_items','design_queue','design_snapshots','order_snapshots','product_catalog','product_media','transactions','production_recap','order_recap','pipeline','pipeline_history','plotting_queue','rekap_bordir','rekap_bordir_items','spk_urgent','invoices','invoice_rows','revenues','payments','expenses','prognosis_entries','material_stock','employees','attendance_logs','employee_performance','employee_rejects','machines','machine_maintenance_logs'
-      ,'carts','cart_items','kv_store','penjahit_assignments'
+      'customers','logistics_master','patterns_master','landing_sections','landing_media','orders','order_items','design_queue','design_snapshots','order_snapshots','product_catalog','product_media','transactions','production_recap','order_recap','pipeline','pipeline_history','plotting_queue','rekap_bordir','rekap_bordir_items','spk_urgent','invoices','invoice_rows','revenues','payments','expenses','prognosis_entries','material_stock','employees','attendance_logs','employee_performance','employee_rejects','machines','machine_maintenance_logs'
+      ,'carts','cart_items'
       ,'spk_revisions','pattern_hpp','pattern_hpp_items'
     ]) as tab
   ) loop

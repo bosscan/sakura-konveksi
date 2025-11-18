@@ -667,42 +667,25 @@ function App() {
         return allowed.includes(seg as any);
       });
 
-      // Additional child filtering for operator roles per-division
+      // Additional child filtering for specific roles
       const filterChildrenForRole = (items: any[]): any[] => {
-        // Map operator role -> division segment under update-divisi
-        const roleToDivision: Record<string, string> = {
-          operator_desainer_pra_produksi: 'pra-produksi',
-          operator_desainer_produksi: 'produksi',
-          operator_cutting_pola: 'cutting-pola',
-          operator_stock_bordir: 'stock-bordir',
-          operator_bordir: 'bordir',
-          operator_setting: 'setting',
-          operator_stock_jahit: 'stock-jahit',
-          operator_jahit: 'jahit',
-          operator_finishing: 'finishing',
-          operator_foto_produk: 'foto-produk',
-          operator_stock_nomor_transaksi: 'stock-nomor-transaksi',
-          operator_pengiriman: 'pengiriman',
-        };
-        const isOperatorRole = Object.prototype.hasOwnProperty.call(roleToDivision, currentRole);
-        if (!isOperatorRole) return items;
-
-        const divisionSegment = roleToDivision[currentRole];
+        if (currentRole !== 'operator_cutting_pola') return items;
         return items.map((it) => {
           if (it.segment !== 'method') return it;
-          // Base allowed items for all operator roles
-          const baseAllowed = new Set(['update-divisi', 'spk-on-proses', 'tabel-proses']);
-          // For desainer roles, also allow database-asset-desain
-          const withExtras = new Set(baseAllowed);
-          if (currentRole === 'operator_desainer_pra_produksi' || currentRole === 'operator_desainer_produksi') {
-            withExtras.add('database-asset-desain');
-          }
-          const filteredChildren = (it.children || []).filter((c: any) => withExtras.has(c.segment));
+          // Allowed under method for operator cutting pola:
+          // - update-divisi > cutting-pola (all its children)
+          // - spk-on-proses
+          // - tabel-proses (all children: desain/produksi/bordir)
+          const allowedMethodSegments = new Set(['update-divisi', 'spk-on-proses', 'tabel-proses']);
+          const filteredChildren = (it.children || []).filter((c: any) => allowedMethodSegments.has(c.segment));
+
+          // Within update-divisi, keep only 'cutting-pola'
           const mapped = filteredChildren.map((c: any) => {
             if (c.segment !== 'update-divisi') return c;
-            const onlyDivision = (c.children || []).filter((d: any) => d.segment === divisionSegment);
-            return { ...c, children: onlyDivision };
+            const onlyCutting = (c.children || []).filter((d: any) => d.segment === 'cutting-pola');
+            return { ...c, children: onlyCutting };
           });
+
           return { ...it, children: mapped };
         });
       };
@@ -718,41 +701,17 @@ function App() {
     let mounted = true;
     (async () => {
       try {
-        const [authVal, roleVal, usernameVal] = await Promise.all([
+        const [authVal, roleVal] = await Promise.all([
           kvStore.get(LS_KEYS.IS_AUTH),
           kvStore.get(LS_KEYS.USER_ROLE),
-          kvStore.get(LS_KEYS.SESSION_USER),
         ]);
         if (!mounted) return;
         const authed = !!authVal;
         setIsAuthed(authed);
-  const roleStr = typeof roleVal === 'string' ? roleVal : undefined;
-  setRole(roleStr);
+  setRole(typeof roleVal === 'string' ? roleVal : undefined);
         if (authed) {
-          const username = typeof usernameVal === 'string' ? usernameVal : '';
-          const formatRole = (r?: string) => {
-            switch (r) {
-              case 'management': return 'Management';
-              case 'cs': return 'Customer Service';
-              case 'admin_produksi': return 'Admin Produksi';
-              case 'operator': return 'Operator';
-              case 'operator_cutting_pola': return 'Operator Cutting Pola';
-              case 'operator_desainer_pra_produksi': return 'Operator Desainer Pra Produksi';
-              case 'operator_desainer_produksi': return 'Operator Desainer Produksi';
-              case 'operator_stock_bordir': return 'Operator Stock Bordir';
-              case 'operator_bordir': return 'Operator Bordir';
-              case 'operator_setting': return 'Operator Setting';
-              case 'operator_stock_jahit': return 'Operator Stock Jahit';
-              case 'operator_jahit': return 'Operator Jahit';
-              case 'operator_finishing': return 'Operator Finishing';
-              case 'operator_foto_produk': return 'Operator Foto Produk';
-              case 'operator_stock_nomor_transaksi': return 'Operator Stock Nomor Transaksi';
-              case 'operator_pengiriman': return 'Operator Pengiriman';
-              default: return (r || '').toString();
-            }
-          };
-          const displayName = formatRole(roleStr) + (username ? ` · ${username}` : '');
-          setSession({ user: { name: displayName, role: roleStr, username } as any })
+          const userData = {}
+          setSession({ user: userData })
         } else {
           navigate('/landing')
         }
@@ -760,67 +719,9 @@ function App() {
         navigate('/landing');
       }
     })();
-    const subR = kvStore.subscribe(LS_KEYS.USER_ROLE, async (v) => {
-      try {
-        const newRole = typeof v === 'string' ? v : undefined;
-        setRole(newRole);
-        const username = await kvStore.get(LS_KEYS.SESSION_USER);
-        const formatRole = (r?: string) => {
-          switch (r) {
-            case 'management': return 'Management';
-            case 'cs': return 'Customer Service';
-            case 'admin_produksi': return 'Admin Produksi';
-            case 'operator': return 'Operator';
-            case 'operator_cutting_pola': return 'Operator Cutting Pola';
-            case 'operator_desainer_pra_produksi': return 'Operator Desainer Pra Produksi';
-            case 'operator_desainer_produksi': return 'Operator Desainer Produksi';
-            case 'operator_stock_bordir': return 'Operator Stock Bordir';
-            case 'operator_bordir': return 'Operator Bordir';
-            case 'operator_setting': return 'Operator Setting';
-            case 'operator_stock_jahit': return 'Operator Stock Jahit';
-            case 'operator_jahit': return 'Operator Jahit';
-            case 'operator_finishing': return 'Operator Finishing';
-            case 'operator_foto_produk': return 'Operator Foto Produk';
-            case 'operator_stock_nomor_transaksi': return 'Operator Stock Nomor Transaksi';
-            case 'operator_pengiriman': return 'Operator Pengiriman';
-            default: return (r || '').toString();
-          }
-        };
-        const uname = typeof username === 'string' ? username : '';
-        const displayName = formatRole(newRole) + (uname ? ` · ${uname}` : '');
-        setSession((prev: any) => ({ ...prev, user: { name: displayName, role: newRole, username: uname } }));
-      } catch {}
-    });
+    const subR = kvStore.subscribe(LS_KEYS.USER_ROLE, (v) => { try { setRole(typeof v === 'string' ? v : undefined); } catch {} });
     const subA = kvStore.subscribe(LS_KEYS.IS_AUTH, (v) => { try { setIsAuthed(!!v); if (!v) navigate('/landing'); } catch {} });
-    const subU = kvStore.subscribe(LS_KEYS.SESSION_USER, async (v) => {
-      try {
-        const uname = typeof v === 'string' ? v : '';
-        const formatRole = (r?: string) => {
-          switch (r) {
-            case 'management': return 'Management';
-            case 'cs': return 'Customer Service';
-            case 'admin_produksi': return 'Admin Produksi';
-            case 'operator': return 'Operator';
-            case 'operator_cutting_pola': return 'Operator Cutting Pola';
-            case 'operator_desainer_pra_produksi': return 'Operator Desainer Pra Produksi';
-            case 'operator_desainer_produksi': return 'Operator Desainer Produksi';
-            case 'operator_stock_bordir': return 'Operator Stock Bordir';
-            case 'operator_bordir': return 'Operator Bordir';
-            case 'operator_setting': return 'Operator Setting';
-            case 'operator_stock_jahit': return 'Operator Stock Jahit';
-            case 'operator_jahit': return 'Operator Jahit';
-            case 'operator_finishing': return 'Operator Finishing';
-            case 'operator_foto_produk': return 'Operator Foto Produk';
-            case 'operator_stock_nomor_transaksi': return 'Operator Stock Nomor Transaksi';
-            case 'operator_pengiriman': return 'Operator Pengiriman';
-            default: return (role || '').toString();
-          }
-        };
-        const displayName = formatRole(role) + (uname ? ` · ${uname}` : '');
-        setSession((prev: any) => ({ ...prev, user: { name: displayName, role, username: uname } }));
-      } catch {}
-    });
-    return () => { mounted = false; try { subR.unsubscribe(); } catch {}; try { subA.unsubscribe(); } catch {}; try { subU.unsubscribe(); } catch {} };
+    return () => { mounted = false; try { subR.unsubscribe(); } catch {}; try { subA.unsubscribe(); } catch {} };
   }, [])
 
   const authentication = useMemo(() => ({

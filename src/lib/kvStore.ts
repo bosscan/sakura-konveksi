@@ -1,18 +1,4 @@
-const API_BASE = (import.meta as any)?.env?.VITE_API_URL?.replace(/\/$/, '') || '';
-
-function lsGet(key: string): any | null {
-  try {
-    const s = window.localStorage.getItem(key);
-    if (s == null) return null;
-    return JSON.parse(s);
-  } catch { return null; }
-}
-function lsSet(key: string, value: any) {
-  try { window.localStorage.setItem(key, JSON.stringify(value)); } catch {}
-}
-function lsRemove(key: string) {
-  try { window.localStorage.removeItem(key); } catch {}
-}
+import { supabase } from './supabaseClient';
 
 // Simple in-memory cache to prevent "blip to empty" when network hiccups occur.
 // We keep the last-known-good value for each key during the SPA session.
@@ -26,19 +12,16 @@ export const kvStore = {
 
   async get(key: string): Promise<any | null> {
     try {
-      const res = await fetch(`${API_BASE}/api/kv/${encodeURIComponent(key)}`);
-      if (!res.ok) throw new Error('HTTP ' + res.status);
-      const payload = await res.json().catch(() => null);
-      const val = payload?.value ?? null;
+      const { data, error } = await supabase.from('kv_store').select('value').eq('key', key).single();
+      if (error) {
+        // On error, return last-known-good from memory if available
+        return memCache.has(key) ? memCache.get(key) : null;
+      }
+      const val = data?.value ?? null;
       if (val !== null && val !== undefined) memCache.set(key, val);
       return val;
     } catch (e) {
-      // fallback to localStorage if available
-      const ls = lsGet(key);
-      if (ls !== null && ls !== undefined) {
-        memCache.set(key, ls);
-        return ls;
-      }
+      // On exception, prefer last-known-good
       return memCache.has(key) ? memCache.get(key) : null;
     }
   },
@@ -47,13 +30,7 @@ export const kvStore = {
     try {
       // Update cache eagerly to keep UI consistent
       memCache.set(key, value);
-      // persist also to localStorage to avoid blank auth on API hiccups
-      lsSet(key, value);
-      await fetch(`${API_BASE}/api/kv/${encodeURIComponent(key)}`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ value })
-      });
+      await supabase.from('kv_store').upsert({ key, value });
     } catch (e) {
       // ignore
     }
@@ -62,8 +39,7 @@ export const kvStore = {
   async remove(key: string) {
     try {
       memCache.delete(key);
-      lsRemove(key);
-      await fetch(`${API_BASE}/api/kv/${encodeURIComponent(key)}`, { method: 'DELETE' });
+      await supabase.from('kv_store').delete().eq('key', key);
     } catch (e) {
       // ignore
     }
@@ -71,25 +47,26 @@ export const kvStore = {
 
   // Subscribe to changes for a specific key. Callback receives newValue (or null on delete).
   subscribe(key: string, cb: (v: any | null) => void) {
-    let stopped = false;
-    let lastSerialized = JSON.stringify(memCache.has(key) ? memCache.get(key) : null);
-    const interval = setInterval(async () => {
-      if (stopped) return;
-      try {
-        const res = await fetch(`${API_BASE}/api/kv/${encodeURIComponent(key)}`);
-        if (!res.ok) return;
-        const payload = await res.json().catch(() => null);
-        const val = payload?.value ?? null;
-        const serialized = JSON.stringify(val);
-        if (serialized !== lastSerialized) {
-          lastSerialized = serialized;
-          if (val !== null && val !== undefined) memCache.set(key, val); else memCache.delete(key);
-          cb(val);
-        }
-      } catch {}
-    }, 2000);
+    const channel = supabase
+      .channel(`kv_store_${key}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'kv_store', filter: `key=eq.${key}` }, (payload: any) => {
+        try {
+          if (payload.eventType === 'DELETE') {
+            memCache.delete(key);
+            cb(null);
+          } else {
+            const val = payload.new?.value ?? null;
+            if (val !== null && val !== undefined) memCache.set(key, val);
+            else memCache.delete(key);
+            cb(val);
+          }
+        } catch {}
+      })
+      .subscribe();
 
-    return { unsubscribe: () => { stopped = true; clearInterval(interval); } };
+    return {
+      unsubscribe: () => { try { supabase.removeChannel(channel); } catch {} }
+    };
   }
 };
 

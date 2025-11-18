@@ -13,7 +13,6 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate()
 
-  // Base accounts (management/admin/cs and one-per-division operators)
   const users =
     [
       { username: 'management', password: 'management-sakura', user: 'Management', role: 'management' },
@@ -21,50 +20,7 @@ function Login() {
       { username: 'cs', password: 'cs-sakura', user: 'Customer Service', role: 'cs' },
       { username: 'operator', password: 'operator-sakura', user: 'Marketing', role: 'operator' },
       { username: 'operator-cutting', password: 'operator-cutting-sakura', user: 'Operator Cutting Pola', role: 'operator_cutting_pola' },
-      { username: 'operator-desainer-pra', password: 'operator-desainer-pra-sakura', user: 'Operator Desainer Pra Produksi', role: 'operator_desainer_pra_produksi' },
-      { username: 'operator-desainer-produksi', password: 'operator-desainer-produksi-sakura', user: 'Operator Desainer Produksi', role: 'operator_desainer_produksi' },
-      { username: 'operator-stock-bordir', password: 'operator-stock-bordir-sakura', user: 'Operator Stock Bordir', role: 'operator_stock_bordir' },
-      { username: 'operator-bordir', password: 'operator-bordir-sakura', user: 'Operator Bordir', role: 'operator_bordir' },
-      { username: 'operator-setting', password: 'operator-setting-sakura', user: 'Operator Setting', role: 'operator_setting' },
-      { username: 'operator-stock-jahit', password: 'operator-stock-jahit-sakura', user: 'Operator Stock Jahit', role: 'operator_stock_jahit' },
-      { username: 'operator-jahit', password: 'operator-jahit-sakura', user: 'Operator Jahit', role: 'operator_jahit' },
-      { username: 'operator-finishing', password: 'operator-finishing-sakura', user: 'Operator Finishing', role: 'operator_finishing' },
-      { username: 'operator-foto-produk', password: 'operator-foto-produk-sakura', user: 'Operator Foto Produk', role: 'operator_foto_produk' },
-      { username: 'operator-stock-nt', password: 'operator-stock-nt-sakura', user: 'Operator Stock Nomor Transaksi', role: 'operator_stock_nomor_transaksi' },
-      { username: 'operator-pengiriman', password: 'operator-pengiriman-sakura', user: 'Operator Pengiriman', role: 'operator_pengiriman' },
-    ] as Array<{ username: string; password: string; user: string; role: string }>;
-
-  // Generate 4 operator accounts per division with pattern: operator-<segment>1..4
-  const operatorDivisions: Array<{ segment: string; label: string; role: string }> = [
-    { segment: 'desainer-pra', label: 'Operator Desainer Pra Produksi', role: 'operator_desainer_pra_produksi' },
-    { segment: 'desainer-produksi', label: 'Operator Desainer Produksi', role: 'operator_desainer_produksi' },
-    { segment: 'cutting', label: 'Operator Cutting Pola', role: 'operator_cutting_pola' },
-    { segment: 'stock-bordir', label: 'Operator Stock Bordir', role: 'operator_stock_bordir' },
-    { segment: 'bordir', label: 'Operator Bordir', role: 'operator_bordir' },
-    { segment: 'setting', label: 'Operator Setting', role: 'operator_setting' },
-    { segment: 'stock-jahit', label: 'Operator Stock Jahit', role: 'operator_stock_jahit' },
-    { segment: 'jahit', label: 'Operator Jahit', role: 'operator_jahit' },
-    { segment: 'finishing', label: 'Operator Finishing', role: 'operator_finishing' },
-    { segment: 'foto-produk', label: 'Operator Foto Produk', role: 'operator_foto_produk' },
-    { segment: 'stock-nt', label: 'Operator Stock Nomor Transaksi', role: 'operator_stock_nomor_transaksi' },
-    { segment: 'pengiriman', label: 'Operator Pengiriman', role: 'operator_pengiriman' },
-  ];
-
-  const multiOperatorUsers = operatorDivisions.flatMap((d) =>
-    Array.from({ length: 4 }, (_, i) => {
-      const n = i + 1;
-      const username = `operator-${d.segment}${n}`;
-      return {
-        username,
-        password: `${username}-sakura`,
-        user: `${d.label} #${n}`,
-        role: d.role,
-      };
-    })
-  );
-
-  // Merge base and generated operator accounts
-  const allUsers = [...users, ...multiOperatorUsers];
+    ];
 
   // restore remembered username from kvStore
   useState(() => {
@@ -86,7 +42,7 @@ function Login() {
 
     // tiny delay for UX
     setTimeout(async () => {
-  const user = allUsers.find(u => u.username === username && u.password === password);
+      const user = users.find(u => u.username === username && u.password === password);
       if (user) {
         // persist auth + role
         try {

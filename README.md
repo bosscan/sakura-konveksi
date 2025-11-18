@@ -68,25 +68,3 @@ export default tseslint.config([
 ])
 ```
 # erp-sakura
-
-## Database schemas
-
-- Supabase/Postgres (recommended): `supabase/schema-relational.sql`
-  - Full schema with RLS policies, realtime publications, views, and RPC functions.
-  - Works with the app’s Supabase client and realtime subscriptions out of the box.
-
-- MariaDB/MySQL (minimal fallback): `supabase/schema-mariadb.sql`
-  - Minimal tables to support the current relational bridge:
-    - `kv_store` (for app-wide key-value state)
-    - `penjahit_assignments` (Dropping Penjahit mapping)
-    - `design_queue` (design data mirror)
-  - No RLS, no realtime, no RPC — you’ll need to adjust the frontend data layer if you run entirely on MariaDB.
-  - Use only if you cannot use Supabase/Postgres.
-
-- MariaDB/MySQL (full tables only): `supabase/schema-mariadb-full.sql`
-  - Creates all tables referenced by the frontend (tables only; no views/RLS/RPC).
-  - Suitable for phpMyAdmin imports. Designed for compatibility (LONGTEXT for JSON, TIMESTAMP for timestamptz).
-  - Use this if you want a complete MariaDB schema for data mirroring/analysis without Supabase-specific features.
-
-> Tip: If you see MySQL/MariaDB errors like `#1064 near 'jsonb'` or `timezone('utc', now())`,
-> you are likely running the Postgres script on MariaDB. Use the MariaDB script instead.
