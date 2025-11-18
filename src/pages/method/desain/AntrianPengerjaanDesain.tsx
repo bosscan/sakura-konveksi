@@ -30,22 +30,41 @@ export default function AntrianPengerjaanDesain() {
         // Warm start from memory cache when available
         const cached = kvStore.peek('design_queue');
         if (cached) {
-          try { const list: QueueItem[] = Array.isArray(cached) ? cached : JSON.parse(String(cached)); setRows(list); setLoading(false); } catch {}
+          try {
+            const list: QueueItem[] = Array.isArray(cached) ? cached : JSON.parse(String(cached));
+            const filtered = await filterOutKeranjang(list);
+            setRows(filtered); setLoading(false);
+          } catch {}
         }
         const raw = await kvStore.get('design_queue');
         const list: QueueItem[] = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
-        if (mounted) { setRows(list); setLoading(false); }
+        const filtered = await filterOutKeranjang(list);
+        if (mounted) { setRows(filtered); setLoading(false); }
       } catch { if (mounted) { setRows([]); setLoading(false); } }
     };
     load();
     try {
       const sub = kvStore.subscribe('design_queue', (v) => {
-        try { const list: QueueItem[] = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) { setRows(list); setLoading(false); } } catch { }
+        try {
+          const list: QueueItem[] = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []);
+          filterOutKeranjang(list).then((filtered) => { if (mounted) { setRows(filtered); setLoading(false); } });
+        } catch { }
       });
       return () => { try { sub.unsubscribe(); } catch {} };
     } catch {}
     return () => { mounted = false; };
   }, []);
+
+  async function filterOutKeranjang(list: QueueItem[]): Promise<QueueItem[]> {
+    try {
+      const kRaw = await kvStore.get('keranjang') || [];
+      const keranjang: any[] = Array.isArray(kRaw) ? kRaw : (typeof kRaw === 'string' ? JSON.parse(kRaw) : []);
+      const rekapSet = new Set<string>();
+      const spkSet = new Set<string>();
+      keranjang.forEach((k) => { if (k?.idRekap) rekapSet.add(String(k.idRekap)); if (k?.idSpk) spkSet.add(String(k.idSpk)); });
+      return list.filter((it) => !rekapSet.has(String(it.idRekapCustom)) && !spkSet.has(String(it.idSpk || '')));
+    } catch { return list; }
+  }
 
   const handleKerjakan = (id: string) => {
     navigate(`/method/update-divisi/pra-produksi/antrian-desain?rekap=${encodeURIComponent(id)}`);

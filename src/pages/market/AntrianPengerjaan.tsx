@@ -249,8 +249,22 @@ export default function AntrianPengerjaan() {
                 dsMap = rawDs && typeof rawDs === 'object' ? rawDs : (typeof rawDs === 'string' ? JSON.parse(rawDs) : {});
             } catch { }
 
+            // Build fast lookup of items already in keranjang to hide from antrian
+            let cartSetRekap = new Set<string>();
+            let cartSetSpk = new Set<string>();
+            try {
+                const kRaw = await kvStore.get('keranjang') || [];
+                const keranjang: any[] = Array.isArray(kRaw) ? kRaw : (typeof kRaw === 'string' ? JSON.parse(kRaw) : []);
+                for (const k of keranjang) {
+                    if (k?.idRekap) cartSetRekap.add(String(k.idRekap));
+                    if (k?.idSpk) cartSetSpk.add(String(k.idSpk));
+                }
+            } catch {}
+
             const mapped: RowData[] = list
                 .filter(it => ((it.status || '').trim().toLowerCase()) !== 'desain di validasi')
+                // Hide anything that is already in keranjang by idRekap or idSpk
+                .filter(it => !cartSetRekap.has(String(it.idRekapCustom)) && !cartSetSpk.has(String(it.idSpk || '')))
                 .map((it) => ({
                     queueId: it.queueId,
                     idRekap: it.idRekapCustom,
