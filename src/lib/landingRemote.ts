@@ -1,22 +1,38 @@
-import Api from './api';
+import { supabase } from './supabaseClient';
 
-export const landingBucketName = 'landing'; // preserved constant for compatibility
+// Allow overriding bucket name via env; default to 'landing'
+const BUCKET = (import.meta as any).env?.VITE_SUPABASE_BUCKET || 'landing';
+export const landingBucketName = BUCKET as string;
 
-// Upload through backend API; folder hint passed in FormData filename suffix
-export async function uploadFilesToCloud(files: FileList | File[] | Blob[], _folder: 'slider' | 'gallery' | 'katalog' = 'slider'): Promise<string[]> {
+function uuid(): string {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    // @ts-ignore
+    return crypto.randomUUID();
+  }
+  return Math.random().toString(36).slice(2) + Date.now().toString(36);
+}
+
+export async function uploadFilesToCloud(files: FileList | File[] | Blob[], folder: 'slider' | 'gallery' | 'katalog' = 'slider'): Promise<string[]> {
   const arr = Array.isArray(files) ? files : Array.from(files as any);
-  // Api.uploadLandingImages already handles multipart; just forward real Files.
-  // Ensure we have File objects; if Blob, wrap into File.
-  const normalized: File[] = arr.map((b: any, i) => {
-    if (b instanceof File) return b;
-    return new File([b], `blob-${i}.bin`, { type: b.type || 'application/octet-stream' });
-  });
-  return Api.uploadLandingImages(normalized);
+  const urls: string[] = [];
+  for (const f of arr) {
+    // File or Blob
+    const name = (f as any).name as string | undefined;
+    const ext = (name ? name.split('.').pop() : undefined) || 'jpg';
+    const path = `${folder}/${uuid()}.${ext}`;
+  const body = f as Blob; // Supabase accepts Blob/File
+  const { error: upErr } = await supabase.storage.from(BUCKET).upload(path, body, { upsert: false, cacheControl: '3600' });
+    if (upErr) {
+      // stop early on first failure to surface error quickly
+      throw upErr;
+    }
+    const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+    if (data?.publicUrl) urls.push(data.publicUrl);
+  }
+  return urls;
 }
 
 export async function getPublicUrlFromPath(path: string): Promise<string | null> {
-  // Backend already returns public URLs; here we just return path if absolute
-  if (/^https?:\/\//i.test(path)) return path;
-  const base = (import.meta as any).env?.VITE_API_URL?.replace(/\/$/, '') || '';
-  return `${base}/uploads/${path.replace(/^\//,'')}`;
+  const { data } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  return data?.publicUrl || null;
 }

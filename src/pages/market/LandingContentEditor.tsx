@@ -27,7 +27,7 @@ import RestoreIcon from '@mui/icons-material/Restore';
 import { LANDING_IMAGES, SOCIAL_LINKS } from '../../lib/landingConfig';
 import kvStore from '../../lib/kvStore';
 import { getObjectUrl, getObjectUrls, saveFiles, getBlob } from '../../lib/landingStore';
-import { uploadFilesToCloud } from '../../lib/landingRemote';
+import { uploadFilesToCloud, landingBucketName } from '../../lib/landingRemote';
 
 // Storage keys
 const K = {
@@ -259,7 +259,7 @@ export default function LandingContentEditor() {
                 }} />
               </Button>
               <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                Cloud di VPS aktif. File akan diunggah ke server (folder uploads).
+                Cloud membutuhkan bucket “{landingBucketName}” (Public) di Supabase → Storage.
               </Typography>
               <Button
                 variant="outlined"
@@ -276,7 +276,7 @@ export default function LandingContentEditor() {
                     setImageCloud((prev) => mergeUnique(prev, urls));
                     setSnack({ open: true, message: 'Sinkronisasi slider ke cloud berhasil. Klik Simpan.', severity: 'success' });
                   } catch (err: any) {
-                    setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Cloud upload error'}`, severity: 'error' });
+                    setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
                   }
                 }}
               >
@@ -454,7 +454,7 @@ export default function LandingContentEditor() {
                 }} />
               </Button>
               <Typography variant="caption" color="text.secondary" sx={{ ml: 1 }}>
-                Cloud di VPS aktif. File akan diunggah ke server (folder uploads).
+                Cloud membutuhkan bucket “{landingBucketName}” (Public) di Supabase → Storage.
               </Typography>
               <Button
                 variant="outlined"
@@ -470,7 +470,7 @@ export default function LandingContentEditor() {
                     setGalleryCloud((prev) => mergeUnique(prev, urls));
                     setSnack({ open: true, message: 'Sinkronisasi galeri ke cloud berhasil. Klik Simpan.', severity: 'success' });
                   } catch (err: any) {
-                    setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Cloud upload error'}`, severity: 'error' });
+                    setSnack({ open: true, message: `Sinkronisasi gagal: ${err?.message || 'Supabase Storage error'}`, severity: 'error' });
                   }
                 }}
               >

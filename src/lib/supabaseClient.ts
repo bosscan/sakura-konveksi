@@ -1,3 +1,3 @@
-// Deprecated client removed during VPS migration.
-// Intentionally empty module to keep legacy imports compiling.
-export {};
+// Supabase removed; this module is kept as a stub to avoid breaking imports.
+export const supabase = null as any;
+export function getSupabaseEnvInfo() { return { url: null, hasKey: false }; }

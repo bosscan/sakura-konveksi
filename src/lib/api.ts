@@ -1,5 +1,3 @@
-// All API calls use the custom backend via HTTP.
-
 const API_BASE = import.meta.env.VITE_API_URL?.replace(/\/$/, '') || '';
 
 async function http(path: string, options: RequestInit = {}) {
@@ -28,7 +26,6 @@ export const Api = {
     return http('/api/plotting-queue/');
   },
   async postCheckout(payload: { idTransaksi?: string; items: Array<{ idSpk: string; idRekapCustom?: string; idCustom?: string; namaDesain?: string; kuantity?: number; }> }) {
-  // Previously used DB-side RPC (checkout_cart); now direct backend endpoint only.
     return http('/api/plotting-queue/checkout/', { method: 'POST', body: JSON.stringify(payload) });
   },
 
