@@ -1,8 +1,8 @@
 import { Box, Button, Grid, Typography, TextField, Select, MenuItem, Modal, TableHead, TableContainer, Table, TableCell, TableRow, TableBody, Paper, FormControl, InputLabel, Snackbar, Alert, Dialog, DialogTitle, DialogContent, DialogActions } from '@mui/material'
-import { useRef } from 'react'
+import { useRef, useMemo } from 'react'
 import TableExportToolbar from '../../../../components/TableExportToolbar'
 import { useEffect, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import EditIcon from '@mui/icons-material/Edit';
 import kvStore from '../../../../lib/kvStore';
 
@@ -17,6 +17,11 @@ interface Asset {
 export default function DetailTambahan() {
   const tableRef = useRef<HTMLTableElement | null>(null)
   const navigate = useNavigate();
+  const { search } = useLocation();
+  const spkId = useMemo(() => {
+    const p = new URLSearchParams(search);
+    return (p.get('spk') || '').trim();
+  }, [search]);
 
   const [bottomStrap, setBottomStrap] = useState('')
   const [armStrap, setArmStrap] = useState('')
@@ -38,39 +43,42 @@ export default function DetailTambahan() {
   const [snack, setSnack] = useState<{ open: boolean; message: string; severity: 'success' | 'error' | 'info' }>({ open: false, message: '', severity: 'success' });
   const [openConfirmDesign, setOpenConfirmDesign] = useState(false);
 
-  // Load and persist tambahan form so it survives navigation and can be used by Print SPK
+  // Load tambahan form only if it belongs to current spkId (prevent leaking previous SPK data)
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         const raw = await kvStore.get('inputTambahanForm');
         const d = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : null);
-        if (!d) throw new Error('no-kv');
-        if (mounted) {
-          setBottomStrap(d.bottomStrap || '');
-          setArmStrap(d.armStrap || '');
-          setBottomTire(d.bottomTire || '');
-          setSkoder(d.skoder || '');
-          setPocketVariant(d.pocketVariant || '');
-          setReflector(d.reflector || '');
-          setColorReflector(d.colorReflector || '');
-          setVentilation(d.ventilation || '');
-          setJahitanVentilasiHorz(d.jahitanVentilasiHorz || '');
-          setPenHolder(d.penHolder || '');
-          setCatTongue(d.catTongue || '');
-          setLanyardHolder(d.lanyardHolder || '');
-          setHTHanger(d.HThanger || '');
+        if (!d) return;
+        if (d && (!d.spkId || (spkId && d.spkId === spkId))) {
+          if (mounted) {
+            setBottomStrap(d.bottomStrap || '');
+            setArmStrap(d.armStrap || '');
+            setBottomTire(d.bottomTire || '');
+            setSkoder(d.skoder || '');
+            setPocketVariant(d.pocketVariant || '');
+            setReflector(d.reflector || '');
+            setColorReflector(d.colorReflector || '');
+            setVentilation(d.ventilation || '');
+            setJahitanVentilasiHorz(d.jahitanVentilasiHorz || '');
+            setPenHolder(d.penHolder || '');
+            setCatTongue(d.catTongue || '');
+            setLanyardHolder(d.lanyardHolder || '');
+            setHTHanger(d.HThanger || '');
+          }
         }
       } catch {}
     })();
     return () => { mounted = false; };
-  }, []);
+  }, [spkId]);
     // (dropdown enums loading removed — kept options placeholder)
 
   useEffect(() => {
     const save = async () => {
       try {
         const data = {
+          spkId: spkId || undefined,
           bottomStrap, armStrap, bottomTire, skoder, pocketVariant, reflector, colorReflector, ventilation, jahitanVentilasiHorz, penHolder, catTongue, lanyardHolder, HThanger,
           // Store labels for printing
           bottomStrapLabel: (options['tali_bawah'] || []).find(o => o.value === bottomStrap)?.label || bottomStrap,

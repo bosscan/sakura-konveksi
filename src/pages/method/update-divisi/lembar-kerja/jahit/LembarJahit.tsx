@@ -45,8 +45,9 @@ export default function LembarJahit() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Jahit. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Jahit. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/jahit/antrian');
+                return;
             }
 
             try {

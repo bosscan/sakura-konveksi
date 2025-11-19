@@ -45,8 +45,9 @@ export default function LembarFotoProduk() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Foto Produk. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Foto Produk. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/foto-produk/antrian');
+                return;
             }
 
             try {

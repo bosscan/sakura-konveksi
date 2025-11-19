@@ -45,8 +45,9 @@ export default function LembarStokJahit() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Stok Jahit. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Stok Jahit. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/stock-jahit/antrian');
+                return;
             }
 
             try {

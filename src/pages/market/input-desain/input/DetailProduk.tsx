@@ -1,10 +1,15 @@
 import { Box, Button, Grid, Typography, Select, MenuItem } from '@mui/material'
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import kvStore from '../../../../lib/kvStore';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function InputDetail() {
     const navigate = useNavigate();
+    const { search } = useLocation();
+    const spkId = useMemo(() => {
+        const p = new URLSearchParams(search);
+        return (p.get('spk') || '').trim();
+    }, [search]);
 
     const [application, setApplication] = useState('');
     const [bordir, setBordir] = useState('');
@@ -52,40 +57,43 @@ export default function InputDetail() {
     //     load();
     // }, [])
 
-    // Load previous selections if present (prefer kvStore)
+    // Load previous selections only if they belong to the current SPK
     useEffect(() => {
         let mounted = true;
         (async () => {
             try {
                 const raw = await kvStore.get('inputProdukForm');
                 const d = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : null);
-                if (!d) throw new Error('no-kv');
-                if (mounted) {
-                    setApplication(d.application || '');
-                    setBordir(d.bordir || '');
-                    setSablon(d.sablon || '');
-                    setJahitan(d.jahitan || '');
-                    setHoodie(d.hoodie || '');
-                    setCuttingButtom(d.cuttingButtom || '');
-                    setSideSlit(d.sideSlit || '');
-                    setNeck(d.neck || '');
-                    setPlacard(d.placard || '');
-                    setPocket(d.pocket || '');
-                    setBottomPocket(d.bottomPocket || '');
-                    setFuringPocket(d.furingPocket || '');
-                    setArmEnd(d.armEnd || '');
-                    setFrontButton(d.frontButton || '');
+                if (!d) return;
+                if (d && (!d.spkId || (spkId && d.spkId === spkId))) {
+                    if (mounted) {
+                        setApplication(d.application || '');
+                        setBordir(d.bordir || '');
+                        setSablon(d.sablon || '');
+                        setJahitan(d.jahitan || '');
+                        setHoodie(d.hoodie || '');
+                        setCuttingButtom(d.cuttingButtom || '');
+                        setSideSlit(d.sideSlit || '');
+                        setNeck(d.neck || '');
+                        setPlacard(d.placard || '');
+                        setPocket(d.pocket || '');
+                        setBottomPocket(d.bottomPocket || '');
+                        setFuringPocket(d.furingPocket || '');
+                        setArmEnd(d.armEnd || '');
+                        setFrontButton(d.frontButton || '');
+                    }
                 }
             } catch {}
         })();
         return () => { mounted = false; };
-    }, []);
+    }, [spkId]);
 
     // Persist on change (async kvStore preferred)
     useEffect(() => {
         const save = async () => {
             try {
                 const data = {
+                    spkId: spkId || undefined,
                     application,
                     bordir,
                     sablon,

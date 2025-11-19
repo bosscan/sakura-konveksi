@@ -45,8 +45,9 @@ export default function LembarPengiriman() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Pengiriman. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Pengiriman. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/pengiriman/antrian');
+                return;
             }
 
             try {

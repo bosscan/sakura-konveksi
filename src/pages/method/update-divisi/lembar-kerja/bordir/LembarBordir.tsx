@@ -44,8 +44,9 @@ export default function LembarBordir() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Bordir. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Bordir. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/bordir/antrian');
+                return;
             }
 
             try {

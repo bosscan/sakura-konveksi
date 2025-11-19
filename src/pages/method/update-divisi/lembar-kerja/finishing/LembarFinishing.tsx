@@ -45,8 +45,9 @@ export default function LembarFinishing() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Finishing. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Finishing. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/finishing/antrian');
+                return;
             }
 
             try {

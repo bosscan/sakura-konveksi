@@ -46,8 +46,9 @@ export default function LembarSetting() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Setting. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // Jangan navigate otomatis; biarkan user tetap di layar.
+                alert('SPK belum masuk antrian Setting. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/setting/antrian');
+                return;
             }
 
             try {

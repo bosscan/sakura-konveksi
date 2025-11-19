@@ -46,8 +46,9 @@ export default function LembarProduksi() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Desainer Produksi. Pastikan alur sebelumnya sesuai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Desainer Produksi. Pastikan alur sebelumnya sesuai.');
+                navigate('/method/update-divisi/produksi/antrian');
+                return;
             }
 
             try {

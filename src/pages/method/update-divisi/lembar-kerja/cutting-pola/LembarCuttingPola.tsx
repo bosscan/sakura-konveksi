@@ -44,8 +44,9 @@ export default function LembarCuttingPola() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Cutting Pola. Pastikan alur sebelumnya sesuai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Cutting Pola. Pastikan alur sebelumnya sesuai.');
+                navigate('/method/update-divisi/cutting-pola/antrian');
+                return;
             }
 
             try {

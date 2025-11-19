@@ -1,17 +1,16 @@
 import { Box, Button, Grid, Typography, TextField, Select, MenuItem } from '@mui/material'
-import { useState } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import kvStore from '../../../../lib/kvStore';
-import { useNavigate } from 'react-router-dom';
-import { useEffect } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 export default function InputSpesifikasi() {
     const navigate = useNavigate();
-    // const { search } = useLocation();
-
-    // const spkId = useMemo(() => {
-    //     const p = new URLSearchParams(search);
-    //     return (p.get('spk') || '').trim();
-    // }, [search]);
+    const { search } = useLocation();
+    // Try to derive spkId from current_spk_context or URL param (if any supplied later)
+    const spkId = useMemo(() => {
+        const p = new URLSearchParams(search);
+        return (p.get('spk') || '').trim();
+    }, [search]);
 
 
     const [nameDesign, setNameDesign] = useState('');
@@ -100,9 +99,35 @@ export default function InputSpesifikasi() {
     //             })();
     // }, []);
 
-    // Save form data to KV (with localStorage fallback) whenever it changes
+    // Load existing form only if it belongs to the current SPK (avoid leaking previous SPK values)
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            try {
+                // Prefer direct kvStore snapshot keyed by spk; legacy key only if matching id
+                const raw = await kvStore.get('inputDetailForm');
+                const d = raw && typeof raw === 'object' ? raw : (raw ? JSON.parse(String(raw)) : null);
+                if (d && (!d.spkId || (spkId && d.spkId === spkId))) {
+                    if (mounted) {
+                        setNameDesign(d.nameDesign || '');
+                        setSample(d.sample || '');
+                        setProduct(d.product || '');
+                        setPattern(d.pattern || '');
+                        setFabric(d.fabric || '');
+                        setFabricColor(d.fabricColor || '');
+                        setColorCombination(d.colorCombination || '');
+                        setCodeColor(d.codeColor || '');
+                    }
+                }
+            } catch {}
+        })();
+        return () => { mounted = false; };
+    }, [spkId]);
+
+    // Persist form with spkId so we can differentiate between SPKs
     useEffect(() => {
         const formData = {
+            spkId: spkId || undefined,
             nameDesign,
             sample,
             product,
@@ -113,11 +138,9 @@ export default function InputSpesifikasi() {
             codeColor,
         };
         (async () => {
-            try {
-                await kvStore.set('inputDetailForm', formData);
-            } catch {}
+            try { await kvStore.set('inputDetailForm', formData); } catch {}
         })();
-    }, [nameDesign, sample, product, pattern, fabric, fabricColor, colorCombination, codeColor]);
+    }, [spkId, nameDesign, sample, product, pattern, fabric, fabricColor, colorCombination, codeColor]);
 
     return (
         <Box sx={{

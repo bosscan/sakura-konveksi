@@ -45,8 +45,9 @@ export default function LembarStokBordir() {
                 } catch {}
             }
             if (!eligible) {
-                setSnack({ open: true, message: 'SPK belum masuk antrian Stock Bordir. Pastikan alur sebelumnya selesai.', severity: 'info' });
-                // do not navigate automatically
+                alert('SPK belum masuk antrian Stok Bordir. Pastikan alur sebelumnya selesai.');
+                navigate('/method/update-divisi/stock-bordir/antrian');
+                return;
             }
 
             try {
