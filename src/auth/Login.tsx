@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveAuth, LS_KEYS } from "../lib/auth";
 import kvStore from "../lib/kvStore";
+import { supabase } from "../lib/supabaseClient";
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -13,14 +14,7 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate()
 
-  const users =
-    [
-      { username: 'management', password: 'management-sakura', user: 'Management', role: 'management' },
-      { username: 'admin', password: 'admin-sakura', user: 'Admin Produksi', role: 'admin_produksi' },
-      { username: 'cs', password: 'cs-sakura', user: 'Customer Service', role: 'cs' },
-      { username: 'operator', password: 'operator-sakura', user: 'Marketing', role: 'operator' },
-      { username: 'operator-cutting', password: 'operator-cutting-sakura', user: 'Operator Cutting Pola', role: 'operator_cutting_pola' },
-    ];
+  // Auth now uses Supabase RPC verify_login_v2
 
   // restore remembered username from kvStore
   useState(() => {
@@ -42,16 +36,58 @@ function Login() {
 
     // tiny delay for UX
     setTimeout(async () => {
-      const user = users.find(u => u.username === username && u.password === password);
-      if (user) {
-        // persist auth + role
+      try {
+        // Prefer the v2 RPC which also logs login events; fallback to v1 if v2 is unavailable
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
+        const tryV2 = await supabase.rpc('verify_login_v2', {
+          p_username: username,
+          p_password: password,
+          p_user_agent: userAgent ?? null,
+          p_ip: null,
+        });
+
+        let data: any = null;
+        let rpcError: string | undefined;
+        if (tryV2.error && tryV2.error.message?.toLowerCase().includes('function') && tryV2.error.message?.toLowerCase().includes('does not exist')) {
+          // fallback to original verify_login if v2 is not deployed
+          const tryV1 = await supabase.rpc('verify_login', {
+            p_username: username,
+            p_password: password,
+          } as any);
+          data = tryV1.data;
+          rpcError = tryV1.error?.message;
+        } else {
+          data = tryV2.data;
+          rpcError = tryV2.error?.message;
+        }
+
+        if (rpcError) {
+          setError(rpcError || 'Gagal login. Coba lagi.');
+          setLoading(false);
+          return;
+        }
+
+        // PostgREST returns either a single row or null
+        if (!data) {
+          setError('Username atau Password salah.');
+          setLoading(false);
+          return;
+        }
+
+        // Try to extract role from common field names provided by our RPC
+        const roleName = (data.role_name ?? data.role ?? data.role_id ?? '').toString();
+        if (!roleName) {
+          setError('Login berhasil tetapi role tidak ditemukan. Hubungi admin.');
+          setLoading(false);
+          return;
+        }
+
         try {
-          // cast to any to satisfy Role typing from helper (roles are controlled strings)
-          await saveAuth(user.role as any, username, remember);
+          await saveAuth(roleName as any, username, remember);
         } catch { /* ignore */ }
         navigate('/');
-      } else {
-        setError('Invalid Username or Password. Try Again');
+      } catch (err: any) {
+        setError(err?.message || 'Terjadi kesalahan saat login.');
         setLoading(false);
       }
     }, 450);
