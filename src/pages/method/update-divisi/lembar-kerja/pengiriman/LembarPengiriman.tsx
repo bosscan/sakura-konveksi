@@ -32,10 +32,21 @@ export default function LembarPengiriman() {
             }
 
             // Gate: must be in Pengiriman queue
-            if (!isSpkInDivisionQueue(spkId, 'pengiriman')) {
-                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-                navigate('/method/update-divisi/pengiriman/antrian');
-                return;
+            // Avoid auto-redirect on initial false. Recheck via kv_store and only show info.
+            let eligible = isSpkInDivisionQueue(spkId, 'pengiriman');
+            if (!eligible) {
+                try {
+                    const raw = await kvStore.get('spk_pipeline');
+                    const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                    const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                    const done = (k: string) => Boolean(it?.[k]);
+                    // Pengiriman: after foto-produk finished, and pengiriman not yet done
+                    eligible = !!it && done('selesaiFotoProduk') && !done('selesaiPengiriman');
+                } catch {}
+            }
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Pengiriman. Pastikan alur sebelumnya selesai.', severity: 'info' });
+                // do not navigate automatically
             }
 
             try {

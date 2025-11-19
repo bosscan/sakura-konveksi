@@ -32,10 +32,21 @@ export default function LembarFinishing() {
             }
 
             // Gate: must be in Finishing queue
-            if (!isSpkInDivisionQueue(spkId, 'finishing')) {
-                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-                navigate('/method/update-divisi/finishing/antrian');
-                return;
+            // Avoid auto-redirect on initial false. Recheck via kv_store and only show info.
+            let eligible = isSpkInDivisionQueue(spkId, 'finishing');
+            if (!eligible) {
+                try {
+                    const raw = await kvStore.get('spk_pipeline');
+                    const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                    const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                    const done = (k: string) => Boolean(it?.[k]);
+                    // Finishing: after jahit finished, and finishing not yet done
+                    eligible = !!it && done('selesaiJahit') && !done('selesaiFinishing');
+                } catch {}
+            }
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Finishing. Pastikan alur sebelumnya selesai.', severity: 'info' });
+                // do not navigate automatically
             }
 
             try {

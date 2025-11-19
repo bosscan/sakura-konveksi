@@ -32,10 +32,21 @@ export default function LembarJahit() {
             }
 
             // Gate: SPK must be inside Jahit queue before this worksheet can be used
-            if (!isSpkInDivisionQueue(spkId, 'jahit')) {
-                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-                navigate('/method/update-divisi/jahit/antrian');
-                return;
+            // Avoid auto-redirect on initial false. Recheck via kv_store and only show info.
+            let eligible = isSpkInDivisionQueue(spkId, 'jahit');
+            if (!eligible) {
+                try {
+                    const raw = await kvStore.get('spk_pipeline');
+                    const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                    const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                    const done = (k: string) => Boolean(it?.[k]);
+                    // Jahit: after stock-jahit finished, and jahit not yet done
+                    eligible = !!it && done('selesaiStockJahit') && !done('selesaiJahit');
+                } catch {}
+            }
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Jahit. Pastikan alur sebelumnya selesai.', severity: 'info' });
+                // do not navigate automatically
             }
 
             try {

@@ -22,13 +22,25 @@ export default function LembarStokTransaksi() {
 
 
     // Gate access: only allow if SPK is currently in this division's queue
+    // Avoid auto-redirect on initial false; recheck via kv_store and only show info
     useEffect(() => {
         if (!spkId) return;
-        const ok = isSpkInDivisionQueue(spkId, 'stock-no-transaksi');
-        if (!ok) {
-            setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-            setTimeout(() => navigate('/method/update-divisi/stok-transaksi/antrian'), 700);
-        }
+        let eligible = isSpkInDivisionQueue(spkId, 'stock-no-transaksi');
+        const recheck = async () => {
+            if (eligible) return;
+            try {
+                const raw = await kvStore.get('spk_pipeline');
+                const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                const done = (k: string) => Boolean(it?.[k]);
+                // Stok No. Transaksi: after foto-produk finished, and pengiriman not yet done
+                eligible = !!it && done('selesaiFotoProduk') && !done('selesaiPengiriman');
+            } catch {}
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Stok Transaksi. Pastikan alur sebelumnya selesai.', severity: 'info' });
+            }
+        };
+        void recheck();
     }, [spkId, navigate]);
 
     useEffect(() => {

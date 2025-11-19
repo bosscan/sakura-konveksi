@@ -32,10 +32,21 @@ export default function LembarStokBordir() {
             }
 
             // Gate: must be in Stok Bordir queue
-            if (!isSpkInDivisionQueue(spkId, 'stock-bordir')) {
-                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-                navigate('/method/update-divisi/stock-bordir/antrian');
-                return;
+            // Avoid auto-redirect on initial false. Recheck via kv_store and only show info.
+            let eligible = isSpkInDivisionQueue(spkId, 'stock-bordir');
+            if (!eligible) {
+                try {
+                    const raw = await kvStore.get('spk_pipeline');
+                    const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                    const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                    const done = (k: string) => Boolean(it?.[k]);
+                    // Stock Bordir: after desain-produksi & cutting-pola finished, and stock-bordir not yet done
+                    eligible = !!it && done('selesaiDesainProduksi') && done('selesaiCuttingPola') && !done('selesaiStockBordir');
+                } catch {}
+            }
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Stock Bordir. Pastikan alur sebelumnya selesai.', severity: 'info' });
+                // do not navigate automatically
             }
 
             try {

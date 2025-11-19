@@ -31,10 +31,23 @@ export default function LembarSetting() {
             }
 
             // Gate: must be in Setting queue
-            if (!isSpkInDivisionQueue(spkId, 'setting')) {
-                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-                navigate('/method/update-divisi/setting/antrian');
-                return;
+            // Note: isSpkInDivisionQueue uses an async cache warm-up, sehingga bisa "false" di awal.
+            // Untuk mencegah auto-redirect saat barcode scan, kita validasi ulang dari kv_store langsung
+            // dan TIDAK melakukan navigate otomatis. Hanya tampilkan info bila belum eligible.
+            let eligible = isSpkInDivisionQueue(spkId, 'setting');
+            if (!eligible) {
+                try {
+                    const raw = await kvStore.get('spk_pipeline');
+                    const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                    const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                    const done = (k: string) => Boolean(it?.[k]);
+                    // Syarat minimal untuk Setting: selesaiBordir sudah terisi, tetapi selesaiSetting belum
+                    eligible = !!it && done('selesaiBordir') && !done('selesaiSetting');
+                } catch {}
+            }
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Setting. Pastikan alur sebelumnya selesai.', severity: 'info' });
+                // Jangan navigate otomatis; biarkan user tetap di layar.
             }
 
             try {

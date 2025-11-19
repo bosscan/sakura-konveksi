@@ -33,10 +33,21 @@ export default function LembarProduksi() {
             }
 
             // Gate: must be in Desainer Produksi queue
-            if (!isSpkInDivisionQueue(spkId, 'desain-produksi')) {
-                setSnack({ open: true, message: 'SPK ini belum masuk ke antrian divisi tersebut.', severity: 'info' });
-                navigate('/method/update-divisi/produksi/antrian');
-                return;
+            // Avoid auto-redirect on initial false (cache warm-up). Recheck via kv_store and only show info.
+            let eligible = isSpkInDivisionQueue(spkId, 'desain-produksi');
+            if (!eligible) {
+                try {
+                    const raw = await kvStore.get('spk_pipeline');
+                    const list: AnyRec[] = Array.isArray(raw) ? raw : [];
+                    const it = list.find((x) => String(x?.idSpk ?? '').trim() === spkId);
+                    const done = (k: string) => Boolean(it?.[k]);
+                    // Desain Produksi eligible if not finished yet
+                    eligible = !!it && !done('selesaiDesainProduksi');
+                } catch {}
+            }
+            if (!eligible) {
+                setSnack({ open: true, message: 'SPK belum masuk antrian Desainer Produksi. Pastikan alur sebelumnya sesuai.', severity: 'info' });
+                // do not navigate automatically
             }
 
             try {
