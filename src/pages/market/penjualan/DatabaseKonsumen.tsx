@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import kvStore from '../../../lib/kvStore';
+import { supabase } from '../../../lib/supabaseClient';
 import { Skeleton } from '@mui/material';
 import {
     Box,
@@ -47,30 +48,91 @@ const DatabaseKonsumen: React.FC = () => {
     const [selectedDate, setSelectedDate] = useState<string>('');
     const [loading, setLoading] = useState<boolean>(true);
 
-    // Load data from kvStore only
+    // Load data, prefer relational table 'customers', fallback ke kv_store('database_konsumen')
     useEffect(() => {
         let mounted = true;
-        const loadKonsumenData = async () => {
+
+        const mapFromCustomers = (rows: any[]): Konsumen[] =>
+            rows.map((r) => ({
+                id: r.id,
+                nama: r.name ?? '',
+                telepon: r.phone ?? '',
+                alamat: r.address ?? '',
+                createdAt: r.created_at ?? '',
+            }));
+
+        const mapFromKV = (arr: any[]): Konsumen[] =>
+            arr.map((k: any, i: number) => ({
+                id: k.id || String(i + 1),
+                nama: k.nama || '',
+                telepon: k.telepon || '',
+                alamat: k.alamat || '',
+                createdAt: k.createdAt || k.created_at || '',
+            }));
+
+        const loadFromCustomers = async (): Promise<boolean> => {
+            try {
+                const { data, error } = await supabase
+                    .from('customers')
+                    .select('id,name,phone,address,created_at')
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                if (!mounted) return true;
+                setKonsumenList(mapFromCustomers(data || []));
+                setLoading(false);
+                return true;
+            } catch (err) {
+                return false;
+            }
+        };
+
+        const loadFromKV = async () => {
             try {
                 // warm from cache if available
                 let arr: any[] = [];
                 try {
                     const cached = kvStore.peek('database_konsumen');
                     if (cached) arr = Array.isArray(cached) ? cached : (cached ? JSON.parse(String(cached)) : []);
-                    if (arr.length) setKonsumenList(arr);
+                    if (arr.length) setKonsumenList(mapFromKV(arr));
                 } catch {}
-                try { const raw = await kvStore.get('database_konsumen'); arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []); } catch { arr = []; }
-                if (mounted) { setKonsumenList(arr); setLoading(false); }
+                try {
+                    const raw = await kvStore.get('database_konsumen');
+                    arr = Array.isArray(raw) ? raw : (raw ? JSON.parse(String(raw)) : []);
+                } catch { arr = []; }
+                if (mounted) { setKonsumenList(mapFromKV(arr)); setLoading(false); }
             } catch (error) {
                 console.error('Error loading konsumen data:', error);
                 if (mounted) { setAlert({ type: 'error', message: 'Gagal memuat data konsumen' }); setLoading(false); }
             }
         };
-        loadKonsumenData();
-        const sub = kvStore.subscribe('database_konsumen', (v: any) => {
-            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) { setKonsumenList(arr); setLoading(false); } } catch {}
+
+        const load = async () => {
+            const ok = await loadFromCustomers();
+            if (!ok) await loadFromKV();
+        };
+
+        load();
+
+        // Realtime: subscribe customers; fallback: kv_store subscription
+        const ch = supabase
+          .channel('rt_customers')
+          .on('postgres_changes', { event: '*', schema: 'public', table: 'customers' }, async () => {
+            if (!mounted) return;
+            try {
+              const { data, error } = await supabase
+                .from('customers')
+                .select('id,name,phone,address,created_at')
+                .order('created_at', { ascending: false });
+              if (!error && mounted) setKonsumenList(mapFromCustomers(data || []));
+            } catch {}
+          })
+          .subscribe();
+
+        const subKV = kvStore.subscribe('database_konsumen', (v: any) => {
+            try { const arr = Array.isArray(v) ? v : (v ? JSON.parse(String(v)) : []); if (mounted) { setKonsumenList(mapFromKV(arr)); setLoading(false); } } catch {}
         });
-        return () => { mounted = false; try { sub.unsubscribe(); } catch {} };
+
+        return () => { mounted = false; try { supabase.removeChannel(ch); } catch {}; try { subKV.unsubscribe(); } catch {} };
     }, []);
 
 
