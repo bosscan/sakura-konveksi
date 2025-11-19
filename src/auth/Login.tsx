@@ -3,7 +3,6 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { saveAuth, LS_KEYS } from "../lib/auth";
 import kvStore from "../lib/kvStore";
-import { supabase } from "../lib/supabaseClient";
 
 function Login() {
   const [username, setUsername] = useState('');
@@ -14,7 +13,58 @@ function Login() {
   const [loading, setLoading] = useState(false);
   const navigate = useNavigate()
 
-  // Auth now uses Supabase RPC verify_login_v2
+  // Base accounts (management/admin/cs and one-per-division operators)
+  const users =
+    [
+      { username: 'management', password: 'management-sakura', user: 'Management', role: 'management' },
+      { username: 'admin', password: 'admin-sakura', user: 'Admin Produksi', role: 'admin_produksi' },
+      { username: 'cs', password: 'cs-sakura', user: 'Customer Service', role: 'cs' },
+      { username: 'operator', password: 'operator-sakura', user: 'Marketing', role: 'operator' },
+      { username: 'operator-cutting', password: 'operator-cutting-sakura', user: 'Operator Cutting Pola', role: 'operator_cutting_pola' },
+      { username: 'operator-desainer-pra', password: 'operator-desainer-pra-sakura', user: 'Operator Desainer Pra Produksi', role: 'operator_desainer_pra_produksi' },
+      { username: 'operator-desainer-produksi', password: 'operator-desainer-produksi-sakura', user: 'Operator Desainer Produksi', role: 'operator_desainer_produksi' },
+      { username: 'operator-stock-bordir', password: 'operator-stock-bordir-sakura', user: 'Operator Stock Bordir', role: 'operator_stock_bordir' },
+      { username: 'operator-bordir', password: 'operator-bordir-sakura', user: 'Operator Bordir', role: 'operator_bordir' },
+      { username: 'operator-setting', password: 'operator-setting-sakura', user: 'Operator Setting', role: 'operator_setting' },
+      { username: 'operator-stock-jahit', password: 'operator-stock-jahit-sakura', user: 'Operator Stock Jahit', role: 'operator_stock_jahit' },
+      { username: 'operator-jahit', password: 'operator-jahit-sakura', user: 'Operator Jahit', role: 'operator_jahit' },
+      { username: 'operator-finishing', password: 'operator-finishing-sakura', user: 'Operator Finishing', role: 'operator_finishing' },
+      { username: 'operator-foto-produk', password: 'operator-foto-produk-sakura', user: 'Operator Foto Produk', role: 'operator_foto_produk' },
+      { username: 'operator-stock-nt', password: 'operator-stock-nt-sakura', user: 'Operator Stock Nomor Transaksi', role: 'operator_stock_nomor_transaksi' },
+      { username: 'operator-pengiriman', password: 'operator-pengiriman-sakura', user: 'Operator Pengiriman', role: 'operator_pengiriman' },
+    ] as Array<{ username: string; password: string; user: string; role: string }>;
+
+  // Generate 4 operator accounts per division with pattern: operator-<segment>1..4
+  const operatorDivisions: Array<{ segment: string; label: string; role: string }> = [
+    { segment: 'desainer-pra', label: 'Operator Desainer Pra Produksi', role: 'operator_desainer_pra_produksi' },
+    { segment: 'desainer-produksi', label: 'Operator Desainer Produksi', role: 'operator_desainer_produksi' },
+    { segment: 'cutting', label: 'Operator Cutting Pola', role: 'operator_cutting_pola' },
+    { segment: 'stock-bordir', label: 'Operator Stock Bordir', role: 'operator_stock_bordir' },
+    { segment: 'bordir', label: 'Operator Bordir', role: 'operator_bordir' },
+    { segment: 'setting', label: 'Operator Setting', role: 'operator_setting' },
+    { segment: 'stock-jahit', label: 'Operator Stock Jahit', role: 'operator_stock_jahit' },
+    { segment: 'jahit', label: 'Operator Jahit', role: 'operator_jahit' },
+    { segment: 'finishing', label: 'Operator Finishing', role: 'operator_finishing' },
+    { segment: 'foto-produk', label: 'Operator Foto Produk', role: 'operator_foto_produk' },
+    { segment: 'stock-nt', label: 'Operator Stock Nomor Transaksi', role: 'operator_stock_nomor_transaksi' },
+    { segment: 'pengiriman', label: 'Operator Pengiriman', role: 'operator_pengiriman' },
+  ];
+
+  const multiOperatorUsers = operatorDivisions.flatMap((d) =>
+    Array.from({ length: 4 }, (_, i) => {
+      const n = i + 1;
+      const username = `operator-${d.segment}${n}`;
+      return {
+        username,
+        password: `${username}-sakura`,
+        user: `${d.label} #${n}`,
+        role: d.role,
+      };
+    })
+  );
+
+  // Merge base and generated operator accounts
+  const allUsers = [...users, ...multiOperatorUsers];
 
   // restore remembered username from kvStore
   useState(() => {
@@ -36,85 +86,16 @@ function Login() {
 
     // tiny delay for UX
     setTimeout(async () => {
-      try {
-        // Prefer the v2 RPC which also logs login events; fallback to v1 if v2 is unavailable
-        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
-        // Try v2 with p_meta first to disambiguate if multiple overloaded functions exist.
-        let data: any = null;
-        let rpcError: string | undefined;
-
-        const callV2WithMeta = async () => supabase.rpc('verify_login_v2', {
-          p_username: username,
-          p_password: password,
-          p_user_agent: userAgent ?? null,
-          p_ip: null,
-          // include meta to force 5-arg overload when present
-          p_meta: { remember } as any,
-        } as any);
-
-        const callV2NoMeta = async () => supabase.rpc('verify_login_v2', {
-          p_username: username,
-          p_password: password,
-          p_user_agent: userAgent ?? null,
-          p_ip: null,
-        } as any);
-
-        const callV1 = async () => supabase.rpc('verify_login', {
-          p_username: username,
-          p_password: password,
-        } as any);
-
-        let res = await callV2WithMeta();
-        if (res.error) {
-          const msg = res.error.message?.toLowerCase() || '';
-          if (msg.includes('does not exist') || msg.includes('could not choose the best candidate function')) {
-            // Retry v2 without meta (handles 4-arg variant)
-            res = await callV2NoMeta();
-          }
-        }
-        if (res.error) {
-          const msg = res.error.message?.toLowerCase() || '';
-          if (msg.includes('does not exist') || msg.includes('could not choose the best candidate function')) {
-            // Fallback to v1
-            const resV1 = await callV1();
-            data = resV1.data;
-            rpcError = resV1.error?.message;
-          } else {
-            data = res.data;
-            rpcError = res.error?.message;
-          }
-        } else {
-          data = res.data;
-          rpcError = undefined;
-        }
-
-        if (rpcError) {
-          setError(rpcError || 'Gagal login. Coba lagi.');
-          setLoading(false);
-          return;
-        }
-
-        // PostgREST returns either a single row or null
-        if (!data) {
-          setError('Username atau Password salah.');
-          setLoading(false);
-          return;
-        }
-
-        // Try to extract role from common field names provided by our RPC
-        const roleName = (data.role_name ?? data.role ?? data.role_id ?? '').toString();
-        if (!roleName) {
-          setError('Login berhasil tetapi role tidak ditemukan. Hubungi admin.');
-          setLoading(false);
-          return;
-        }
-
+  const user = allUsers.find(u => u.username === username && u.password === password);
+      if (user) {
+        // persist auth + role
         try {
-          await saveAuth(roleName as any, username, remember);
+          // cast to any to satisfy Role typing from helper (roles are controlled strings)
+          await saveAuth(user.role as any, username, remember);
         } catch { /* ignore */ }
         navigate('/');
-      } catch (err: any) {
-        setError(err?.message || 'Terjadi kesalahan saat login.');
+      } else {
+        setError('Invalid Username or Password. Try Again');
         setLoading(false);
       }
     }, 450);
