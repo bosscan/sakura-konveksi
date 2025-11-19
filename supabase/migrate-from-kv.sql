@@ -66,6 +66,43 @@ on conflict (id) do update
       jenis_pola = excluded.jenis_pola,
       status = excluded.status;
 
+-- 2b) Seed minimal ORDERS from kv sources so foreign keys are satisfied before migrating pipeline
+-- Collect distinct idSpk from design_queue and spk_pipeline KV payloads
+with dq_src as (
+  select (value)::jsonb as arr
+  from public.kv_store
+  where key = 'design_queue'
+), dq_flat as (
+  select jsonb_array_elements(coalesce(arr, '[]'::jsonb)) as o from dq_src
+), sp_src as (
+  select (value)::jsonb as arr
+  from public.kv_store
+  where key = 'spk_pipeline'
+), sp_flat as (
+  select jsonb_array_elements(coalesce(arr, '[]'::jsonb)) as o from sp_src
+), ids as (
+  select distinct nullif(o->>'idSpk','')::char(7) as id_spk,
+                  nullif(o->>'tanggalInput','')::timestamptz as tanggal_input,
+                  o->>'namaPemesan' as nama_pemesan,
+                  o->>'namaCS' as nama_cs
+  from dq_flat
+  union
+  select distinct nullif(o->>'idSpk','')::char(7) as id_spk,
+                  null::timestamptz as tanggal_input,
+                  null::text as nama_pemesan,
+                  null::text as nama_cs
+  from sp_flat
+)
+insert into public.orders (id_spk, nama_pemesan, cs_name, tanggal_input, created_at)
+select id_spk,
+       nama_pemesan,
+       nama_cs,
+       coalesce(tanggal_input, now()),
+       coalesce(tanggal_input, now())
+from ids
+where id_spk is not null
+on conflict (id_spk) do nothing;
+
 -- 3) Pipeline snapshot (if you stored 'spk_pipeline' in kv_store)
 with src3 as (
   select (value)::jsonb as arr
