@@ -16,15 +16,20 @@ with src as (
 )
 insert into public.customers(id, name, phone, address, created_at)
 select
-  coalesce(nullif(o->>'id','')::uuid, gen_random_uuid()) as id,
+  -- If kv id is not a UUID (e.g., "KONS-..."), generate a new uuid
+  case
+    when (o->>'id') ~* '^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$'
+      then (o->>'id')::uuid
+    else gen_random_uuid()
+  end as id,
   o->>'nama'   as name,
   o->>'telepon' as phone,
   o->>'alamat' as address,
   coalesce((o->>'createdAt')::timestamptz, now()) as created_at
 from flat
-on conflict (id) do update
+-- Prefer upsert by unique phone to avoid duplicating the same customer when ids are non-uuid
+on conflict (phone) do update
   set name = excluded.name,
-      phone = excluded.phone,
       address = excluded.address;
 
 -- 2) Design queue (optional): if you kept a 'design_queue' array in kv_store
