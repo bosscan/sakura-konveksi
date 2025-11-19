@@ -39,26 +39,53 @@ function Login() {
       try {
         // Prefer the v2 RPC which also logs login events; fallback to v1 if v2 is unavailable
         const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent : undefined;
-        const tryV2 = await supabase.rpc('verify_login_v2', {
+        // Try v2 with p_meta first to disambiguate if multiple overloaded functions exist.
+        let data: any = null;
+        let rpcError: string | undefined;
+
+        const callV2WithMeta = async () => supabase.rpc('verify_login_v2', {
           p_username: username,
           p_password: password,
           p_user_agent: userAgent ?? null,
           p_ip: null,
-        });
+          // include meta to force 5-arg overload when present
+          p_meta: { remember } as any,
+        } as any);
 
-        let data: any = null;
-        let rpcError: string | undefined;
-        if (tryV2.error && tryV2.error.message?.toLowerCase().includes('function') && tryV2.error.message?.toLowerCase().includes('does not exist')) {
-          // fallback to original verify_login if v2 is not deployed
-          const tryV1 = await supabase.rpc('verify_login', {
-            p_username: username,
-            p_password: password,
-          } as any);
-          data = tryV1.data;
-          rpcError = tryV1.error?.message;
+        const callV2NoMeta = async () => supabase.rpc('verify_login_v2', {
+          p_username: username,
+          p_password: password,
+          p_user_agent: userAgent ?? null,
+          p_ip: null,
+        } as any);
+
+        const callV1 = async () => supabase.rpc('verify_login', {
+          p_username: username,
+          p_password: password,
+        } as any);
+
+        let res = await callV2WithMeta();
+        if (res.error) {
+          const msg = res.error.message?.toLowerCase() || '';
+          if (msg.includes('does not exist') || msg.includes('could not choose the best candidate function')) {
+            // Retry v2 without meta (handles 4-arg variant)
+            res = await callV2NoMeta();
+          }
+        }
+        if (res.error) {
+          const msg = res.error.message?.toLowerCase() || '';
+          if (msg.includes('does not exist') || msg.includes('could not choose the best candidate function')) {
+            // Fallback to v1
+            const resV1 = await callV1();
+            data = resV1.data;
+            rpcError = resV1.error?.message;
+          } else {
+            data = res.data;
+            rpcError = res.error?.message;
+          }
         } else {
-          data = tryV2.data;
-          rpcError = tryV2.error?.message;
+          data = res.data;
+          rpcError = undefined;
         }
 
         if (rpcError) {
